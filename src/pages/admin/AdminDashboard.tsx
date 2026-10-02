@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import './AdminDashboard.css'
 
 const initialServices = [
   {
@@ -47,49 +48,58 @@ function AdminDashboard() {
   ).length
 
   return (
-    <div>
+    <div className="admin-dashboard">
       <h1>Admin Dashboard</h1>
 
-      <div>
+      {/* Overview Section */}
+      <div className="overview">
         <h2>Overview</h2>
 
-        <div>
-          <h3>Open Services</h3>
-          <p>{openServices}</p>
-        </div>
+        <div className="overview-cards">
+          <div className="stat-card">
+            <h3>Open Services</h3>
+            <p>{openServices}</p>
+          </div>
 
-        <Link to="/admin/services">
-          <button>Manage Services</button>
-        </Link>
-
-        <div>
-          <h3>People Waiting</h3>
-          <p>{totalWaiting}</p>
+          <div className="stat-card">
+            <h3>People Waiting</h3>
+            <p>{totalWaiting}</p>
+          </div>
         </div>
       </div>
 
-      <h2>Services</h2>
+      {/* Services Section */}
+      <div className="services-section">
+        <div className="services-header">
+          <h2>Services</h2>
 
-      {services.map((service) => (
-        <div key={service.id}>
-          <h3>{service.name}</h3>
-
-          <p>Queue Length: {service.queueLength}</p>
-          <p>Estimated Wait: {service.waitTime} minutes</p>
-
-          <p>
-            Status: {service.isOpen ? 'Open' : 'Closed'}
-          </p>
-
-          <button onClick={() => toggleQueue(service.id)}>
-            {service.isOpen ? 'Close Queue' : 'Open Queue'}
-          </button>
-
-          <hr />
+          <Link to="/admin/services">
+            <button>Manage Services</button>
+          </Link>
         </div>
-      ))}
+
+        <div className="services-list">
+          {services.map((service) => (
+            <div className="service-card" key={service.id}>
+              <h3>{service.name}</h3>
+
+              <p>
+                Queue Status:{' '}
+                <strong>{service.isOpen ? 'Open' : 'Closed'}</strong>
+              </p>
+
+              <p>People Waiting: {service.queueLength}</p>
+
+              <p>Estimated Wait: {service.waitTime} minutes</p>
+
+              <button onClick={() => toggleQueue(service.id)}>
+                {service.isOpen ? 'Close Queue' : 'Open Queue'}
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
-
 export default AdminDashboard

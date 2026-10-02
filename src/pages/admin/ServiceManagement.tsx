@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import './ServiceManagement.css'
 
 type Service = {
   id: number
@@ -96,106 +97,134 @@ function ServiceManagement() {
   }
 
   return (
-    <div>
-      <h1>Service Management</h1>
-
-      <Link to="/admin">
-        <button>Back to Dashboard</button>
-      </Link>
-
-      <h2>Add New Service</h2>
-
-      <form onSubmit={handleSubmit}>
+    <div className="service-management">
+      <div className="service-management-header">
         <div>
-          <label>Service Name</label>
-          <br />
-
-          <input
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            required
-            maxLength={100}
-          />
+          <h1>Service Management</h1>
+          <p>Create, edit, and manage available services.</p>
         </div>
 
-        <div>
-          <label>Description</label>
-          <br />
+        <Link to="/admin">
+          <button className="back-button">Back to Dashboard</button>
+        </Link>
+      </div>
 
-          <textarea
-            value={description}
-            onChange={(event) => setDescription(event.target.value)}
-            required
-          />
+      {/* Add / Edit Service Form */}
+      <div className="service-form-card">
+        <h2>
+          {editingId !== null ? 'Edit Service' : 'Add New Service'}
+        </h2>
+
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label>Service Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+              maxLength={100}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>Description</label>
+            <textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+              required
+            />
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label>Expected Duration (minutes)</label>
+              <input
+                type="number"
+                value={duration}
+                onChange={(event) => setDuration(event.target.value)}
+                required
+                min="1"
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Priority Level</label>
+              <select
+                value={priority}
+                onChange={(event) =>
+                  setPriority(
+                    event.target.value as 'low' | 'medium' | 'high'
+                  )
+                }
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-actions">
+            <button className="primary-button" type="submit">
+              {editingId !== null ? 'Update Service' : 'Create Service'}
+            </button>
+
+            {editingId !== null && (
+              <button
+                className="cancel-button"
+                type="button"
+                onClick={cancelEdit}
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </form>
+      </div>
+
+      {/* Existing Services */}
+      <div className="existing-services">
+        <h2>Existing Services</h2>
+
+        <div className="service-management-list">
+          {services.map((service) => (
+            <div className="management-service-card" key={service.id}>
+              <div className="service-card-content">
+                <h3>{service.name}</h3>
+
+                <p>{service.description}</p>
+
+                <div className="service-details">
+                  <span>
+                    <strong>Duration:</strong> {service.duration} minutes
+                  </span>
+
+                  <span>
+                    <strong>Priority:</strong> {service.priority}
+                  </span>
+                </div>
+              </div>
+
+              <div className="service-actions">
+                <button
+                  className="edit-button"
+                  onClick={() => editService(service)}
+                >
+                  Edit
+                </button>
+
+                <button
+                  className="delete-button"
+                  onClick={() => deleteService(service.id)}
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
-
-        <div>
-          <label>Expected Duration (minutes)</label>
-          <br />
-
-          <input
-            type="number"
-            value={duration}
-            onChange={(event) => setDuration(event.target.value)}
-            required
-            min="1"
-          />
-        </div>
-
-        <div>
-          <label>Priority Level</label>
-          <br />
-
-          <select
-            value={priority}
-            onChange={(event) =>
-              setPriority(
-                event.target.value as 'low' | 'medium' | 'high'
-              )
-            }
-          >
-            <option value="low">Low</option>
-            <option value="medium">Medium</option>
-            <option value="high">High</option>
-          </select>
-        </div>
-
-        <br />
-
-        <button type="submit">
-          {editingId !== null ? 'Update Service' : 'Create Service'}
-        </button>
-
-        {editingId !== null && (
-          <button type="button" onClick={cancelEdit}>
-            Cancel
-          </button>
-        )}
-
-      </form>
-
-      <hr />
-
-      <h2>Existing Services</h2>
-
-      {services.map((service) => (
-        <div key={service.id}>
-          <h3>{service.name}</h3>
-
-          <p>{service.description}</p>
-          <p>Expected Duration: {service.duration} minutes</p>
-          <p>Priority: {service.priority}</p>
-
-          <button onClick={() => editService(service)}>Edit</button>
-
-          <button onClick={() => deleteService(service.id)}>
-            Delete
-          </button>
-
-          <hr />
-        </div>
-      ))}
+      </div>
     </div>
   )
 }
