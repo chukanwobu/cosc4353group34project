@@ -122,3 +122,19 @@
   color: var(--muted);
   font-size: 0.8rem;
 }
+
+/* Added for the Register screen */
+.login__help {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.login__alert--success {
+  color: #14532d;
+  background: #e6f4ea;
+}
+
+.login__submit:disabled {
+  background: var(--muted);
+  cursor: not-allowed;
+}
