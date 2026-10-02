@@ -1,193 +1,274 @@
 .service-management {
   max-width: 1100px;
   margin: 0 auto;
-  padding: 40px;
-  font-family: Arial, sans-serif;
-  text-align: left;
-  color: #1f2937;
+  padding: 2rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
 }
 
 .service-management-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
-}
+  border-bottom: 2px solid #e2e8f0;
+  padding-bottom: 1rem;
 
-.service-management-header h1 {
-  margin: 0 0 8px;
-  font-size: 36px;
-}
-
-.service-management-header p {
-  margin: 0;
-  color: #6b7280;
+  h1 {
+    font-size: 1.875rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 0.25rem 0;
+  }
+  p {
+    color: #64748b;
+    margin: 0;
+  }
 }
 
 .back-button {
-  background: #374151;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 10px 16px;
+  background-color: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  padding: 0.55rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
   cursor: pointer;
-}
 
-/* Form */
+  &:hover {
+    background-color: #e2e8f0;
+  }
+}
 
 .service-form-card {
-  background: #f3f4f6;
-  border-radius: 12px;
-  padding: 25px;
-  margin-bottom: 40px;
-}
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  padding: 1.75rem;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
 
-.service-form-card h2 {
-  margin-top: 0;
+  h2 {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 1.25rem 0;
+  }
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
-  flex: 1;
-  margin-bottom: 18px;
+  gap: 0.35rem;
+  margin-bottom: 1.25rem;
+
+  label {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #334155;
+  }
+
+  input,
+  textarea,
+  select {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0.65rem 0.85rem;
+    font-size: 0.95rem;
+    outline: none;
+
+    &:focus {
+      border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    }
+  }
 }
 
-.form-group label {
-  font-weight: bold;
-  margin-bottom: 7px;
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.form-group input,
-.form-group textarea,
-.form-group select {
-  padding: 11px;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 15px;
-  background: white;
-  color: #1f2937;
+.char-counter {
+  font-size: 0.75rem;
+  color: #64748b;
+
+  &.char-counter--limit {
+    color: #dc2626;
+    font-weight: 700;
+  }
 }
 
-.form-group textarea {
-  min-height: 90px;
-  resize: vertical;
+.input-error {
+  border-color: #ef4444 !important;
+}
+
+.error-text {
+  color: #dc2626;
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
 .form-row {
-  display: flex;
-  gap: 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.25rem;
 }
 
 .form-actions {
   display: flex;
-  gap: 10px;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
 }
 
 .primary-button {
-  background: #2563eb;
+  background-color: #2563eb;
   color: white;
   border: none;
-  border-radius: 6px;
-  padding: 10px 18px;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
-}
 
-.primary-button:hover {
-  background: #1d4ed8;
+  &:hover {
+    background-color: #1d4ed8;
+  }
 }
 
 .cancel-button {
-  background: #6b7280;
-  color: white;
+  background-color: #e2e8f0;
+  color: #1e293b;
   border: none;
-  border-radius: 6px;
-  padding: 10px 18px;
+  padding: 0.65rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9rem;
   cursor: pointer;
+
+  &:hover {
+    background-color: #cbd5e1;
+  }
 }
 
-/* Existing Services */
-
+/* List */
 .existing-services h2 {
-  margin-bottom: 20px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 1rem 0;
 }
 
 .service-management-list {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 1rem;
 }
 
 .management-service-card {
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
-  padding: 22px;
+  background-color: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 1.25rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: white;
+  gap: 1.5rem;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
 }
 
-.management-service-card h3 {
-  margin: 0 0 8px;
+.service-card-content {
+  flex: 1;
+
+  p {
+    margin: 0.35rem 0 0.75rem 0;
+    color: #64748b;
+    font-size: 0.9rem;
+  }
 }
 
-.management-service-card p {
-  margin: 0 0 12px;
-  color: #6b7280;
+.card-title-line {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+
+  h3 {
+    margin: 0;
+    font-size: 1.1rem;
+    color: #0f172a;
+  }
+}
+
+.priority-badge {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 0.15rem 0.5rem;
+  border-radius: 9999px;
+
+  &.priority-high {
+    background-color: #fee2e2;
+    color: #991b1b;
+  }
+  &.priority-medium {
+    background-color: #fef3c7;
+    color: #92400e;
+  }
+  &.priority-low {
+    background-color: #e0e7ff;
+    color: #3730a3;
+  }
 }
 
 .service-details {
   display: flex;
-  gap: 25px;
-  text-transform: capitalize;
+  gap: 1.5rem;
+  font-size: 0.85rem;
+  color: #475569;
 }
 
 .service-actions {
   display: flex;
-  gap: 10px;
-}
-
-.edit-button,
-.delete-button {
-  border: none;
-  border-radius: 6px;
-  padding: 9px 16px;
-  cursor: pointer;
+  gap: 0.5rem;
 }
 
 .edit-button {
-  background: #374151;
-  color: white;
+  background-color: #eff6ff;
+  color: #2563eb;
+  border: 1px solid #bfdbfe;
+  padding: 0.5rem 0.85rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #2563eb;
+    color: white;
+  }
 }
 
 .delete-button {
-  background: #dc2626;
-  color: white;
+  background-color: #fef2f2;
+  color: #dc2626;
+  border: 1px solid #fecaca;
+  padding: 0.5rem 0.85rem;
+  border-radius: 6px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+
+  &:hover {
+    background-color: #dc2626;
+    color: white;
+  }
 }
 
-.edit-button:hover {
-  background: #1f2937;
-}
-
-.delete-button:hover {
-  background: #b91c1c;
-}
-
-@media (max-width: 700px) {
-  .service-management-header,
-  .management-service-card,
+@media (max-width: 768px) {
   .form-row {
-    flex-direction: column;
-    align-items: stretch;
+    grid-template-columns: 1fr;
   }
-
-  .service-actions {
-    margin-top: 20px;
-  }
-
-  .service-details {
+  .management-service-card {
     flex-direction: column;
-    gap: 5px;
+    align-items: flex-start;
   }
 }

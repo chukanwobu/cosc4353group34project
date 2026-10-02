@@ -1,47 +1,29 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQueue } from '../../context/QueueContext'
+import type { Priority, Service } from '../../context/QueueContext'
 import './ServiceManagement.css'
 
-type Service = {
-  id: number
-  name: string
-  description: string
-  duration: number
-  priority: 'low' | 'medium' | 'high'
-}
-
-const initialServices: Service[] = [
-  {
-    id: 1,
-    name: 'Academic Advising',
-    description: 'Meet with an advisor for academic assistance.',
-    duration: 15,
-    priority: 'high',
-  },
-  {
-    id: 2,
-    name: 'Financial Aid',
-    description: 'Get assistance with financial aid questions.',
-    duration: 20,
-    priority: 'medium',
-  },
-]
-
-function ServiceManagement() {
-  const [services, setServices] = useState<Service[]>(initialServices)
+export const ServiceManagement: React.FC = () => {
+  const { services, addService, updateService, deleteService } = useQueue()
 
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [duration, setDuration] = useState('')
-  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('low')
-
+  const [priority, setPriority] = useState<Priority>('low')
   const [editingId, setEditingId] = useState<number | null>(null)
 
-  const deleteService = (id: number) => {
-  setServices(
-    services.filter((service) => service.id !== id)
-  )
-}
+  const [errors, setErrors] = useState<{ name?: string; description?: string; duration?: string }>({})
+
+  const MAX_NAME_LEN = 100
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value
+    if (val.length <= MAX_NAME_LEN) {
+      setName(val)
+      if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }))
+    }
+  }
 
   const editService = (service: Service) => {
     setEditingId(service.id)
@@ -49,6 +31,7 @@ function ServiceManagement() {
     setDescription(service.description)
     setDuration(service.duration.toString())
     setPriority(service.priority)
+    setErrors({})
   }
 
   const cancelEdit = () => {
@@ -57,43 +40,50 @@ function ServiceManagement() {
     setDescription('')
     setDuration('')
     setPriority('low')
+    setErrors({})
   }
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    if (editingId !== null) {
-      setServices(
-        services.map((service) =>
-          service.id === editingId
-            ? {
-                ...service,
-                name,
-                description,
-                duration: Number(duration),
-                priority,
-              }
-            : service
-        )
-      )
+    const newErrors: typeof errors = {}
+    if (!name.trim()) newErrors.name = 'Service name is required.'
+    else if (name.length > MAX_NAME_LEN) newErrors.name = `Service name cannot exceed ${MAX_NAME_LEN} characters.`
 
+    if (!description.trim()) newErrors.description = 'Service description is required.'
+
+    const numDuration = Number(duration)
+    if (!duration || isNaN(numDuration) || numDuration < 1) {
+      newErrors.duration = 'Expected duration must be a positive number (minimum 1 minute).'
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors)
+      return
+    }
+
+    if (editingId !== null) {
+      updateService(editingId, {
+        name: name.trim(),
+        description: description.trim(),
+        duration: numDuration,
+        priority,
+      })
       setEditingId(null)
     } else {
-      const newService: Service = {
-        id: Date.now(),
-        name,
-        description,
-        duration: Number(duration),
+      addService({
+        name: name.trim(),
+        description: description.trim(),
+        duration: numDuration,
         priority,
-      }
-
-      setServices([...services, newService])
+      })
     }
 
     setName('')
     setDescription('')
     setDuration('')
     setPriority('low')
+    setErrors({})
   }
 
   return (
@@ -101,82 +91,94 @@ function ServiceManagement() {
       <div className="service-management-header">
         <div>
           <h1>Service Management</h1>
-          <p>Create, edit, and manage available services.</p>
+          <p>Create, edit, and configure available campus services and estimated wait parameters.</p>
         </div>
 
         <Link to="/admin">
-          <button className="back-button">Back to Dashboard</button>
+          <button className="back-button">← Back to Admin Dashboard</button>
         </Link>
       </div>
 
       {/* Add / Edit Service Form */}
       <div className="service-form-card">
-        <h2>
-          {editingId !== null ? 'Edit Service' : 'Add New Service'}
-        </h2>
+        <h2>{editingId !== null ? '✏️ Edit Existing Service' : '➕ Create New Campus Service'}</h2>
 
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} noValidate>
           <div className="form-group">
-            <label>Service Name</label>
+            <div className="label-row">
+              <label htmlFor="service-name">Service Name *</label>
+              <span className={`char-counter ${name.length >= MAX_NAME_LEN ? 'char-counter--limit' : ''}`}>
+                {name.length} / {MAX_NAME_LEN} chars
+              </span>
+            </div>
             <input
+              id="service-name"
               type="text"
               value={name}
-              onChange={(event) => setName(event.target.value)}
-              required
-              maxLength={100}
+              onChange={handleNameChange}
+              maxLength={MAX_NAME_LEN}
+              placeholder="E.g., International Student Services"
+              className={errors.name ? 'input-error' : ''}
             />
+            {errors.name && <span className="error-text">{errors.name}</span>}
           </div>
 
           <div className="form-group">
-            <label>Description</label>
+            <label htmlFor="service-desc">Description *</label>
             <textarea
+              id="service-desc"
+              rows={3}
               value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              required
+              onChange={(event) => {
+                setDescription(event.target.value)
+                if (errors.description) setErrors((prev) => ({ ...prev, description: undefined }))
+              }}
+              placeholder="Describe the service purpose and required documentation..."
+              className={errors.description ? 'input-error' : ''}
             />
+            {errors.description && <span className="error-text">{errors.description}</span>}
           </div>
 
           <div className="form-row">
             <div className="form-group">
-              <label>Expected Duration (minutes)</label>
+              <label htmlFor="service-duration">Expected Duration (minutes) *</label>
               <input
+                id="service-duration"
                 type="number"
                 value={duration}
-                onChange={(event) => setDuration(event.target.value)}
-                required
+                onChange={(event) => {
+                  setDuration(event.target.value)
+                  if (errors.duration) setErrors((prev) => ({ ...prev, duration: undefined }))
+                }}
                 min="1"
+                placeholder="15"
+                className={errors.duration ? 'input-error' : ''}
               />
+              {errors.duration && <span className="error-text">{errors.duration}</span>}
             </div>
 
             <div className="form-group">
-              <label>Priority Level</label>
+              <label htmlFor="service-priority">Priority Level</label>
               <select
+                id="service-priority"
                 value={priority}
-                onChange={(event) =>
-                  setPriority(
-                    event.target.value as 'low' | 'medium' | 'high'
-                  )
-                }
+                onChange={(event) => setPriority(event.target.value as Priority)}
               >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
+                <option value="low">Low Priority</option>
+                <option value="medium">Medium Priority</option>
+                <option value="high">High Priority</option>
               </select>
             </div>
           </div>
 
           <div className="form-actions">
             <button className="primary-button" type="submit">
-              {editingId !== null ? 'Update Service' : 'Create Service'}
+              {editingId !== null ? 'Update Service' : 'Save New Service'}
             </button>
 
             {editingId !== null && (
-              <button
-                className="cancel-button"
-                type="button"
-                onClick={cancelEdit}
-              >
-                Cancel
+              <button className="cancel-button" type="button" onClick={cancelEdit}>
+                Cancel Edit
               </button>
             )}
           </div>
@@ -185,39 +187,36 @@ function ServiceManagement() {
 
       {/* Existing Services */}
       <div className="existing-services">
-        <h2>Existing Services</h2>
+        <h2>Active Services Catalog ({services.length})</h2>
 
         <div className="service-management-list">
           {services.map((service) => (
             <div className="management-service-card" key={service.id}>
               <div className="service-card-content">
-                <h3>{service.name}</h3>
+                <div className="card-title-line">
+                  <h3>{service.name}</h3>
+                  <span className={`priority-badge priority-${service.priority}`}>
+                    {service.priority.toUpperCase()}
+                  </span>
+                </div>
 
                 <p>{service.description}</p>
 
                 <div className="service-details">
                   <span>
-                    <strong>Duration:</strong> {service.duration} minutes
+                    <strong>Duration:</strong> {service.duration} mins / student
                   </span>
-
                   <span>
-                    <strong>Priority:</strong> {service.priority}
+                    <strong>Status:</strong> {service.isOpen ? 'Open' : 'Closed'}
                   </span>
                 </div>
               </div>
 
               <div className="service-actions">
-                <button
-                  className="edit-button"
-                  onClick={() => editService(service)}
-                >
+                <button className="edit-button" onClick={() => editService(service)}>
                   Edit
                 </button>
-
-                <button
-                  className="delete-button"
-                  onClick={() => deleteService(service.id)}
-                >
+                <button className="delete-button" onClick={() => deleteService(service.id)}>
                   Delete
                 </button>
               </div>

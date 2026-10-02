@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Assignment 2 Report - QueueSmart (COSC 4353 Group 34)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #1e293b;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      background-color: #ffffff;
+    }
+    h1, h2, h3, h4 {
+      color: #0f172a;
+      font-weight: 700;
+    }
+    h1 {
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    h2 {
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 0.3rem;
+      margin-top: 2rem;
+    }
+    .note-box {
+      background-color: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 1rem;
+      border-radius: 4px;
+      margin: 1rem 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 0.75rem;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    th {
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+    pre {
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: monospace;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    code {
+      background-color: #f1f5f9;
+      color: #0f172a;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+    pre code {
+      background: none;
+      color: inherit;
+      padding: 0;
+    }
+    .figure-title {
+      font-weight: 700;
+      color: #2563eb;
+      font-size: 1.1rem;
+      margin-top: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Assignment 2: UI / UX Design and Front-End Implementation (A2)</h1>
+  <p><strong>Project Name:</strong> QueueSmart – Smart Queue Management Application<br>
+  <strong>Course:</strong> COSC 4353 – Software Design (2026 Fall)<br>
+  <strong>Team Name / Number:</strong> Group 34<br>
+  <strong>Team Members:</strong> Samuel Sabu, Jordan, Chuka, Luis</p>
+
+  <h2>1. GitHub Repository Link</h2>
+  <p><strong>Repository URL:</strong> <a href="https://github.com/chukanwobu/cosc4353group34project" target="_blank">https://github.com/chukanwobu/cosc4353group34project</a></p>
+  
+  <div class="note-box">
+    <strong>TA Verification Note:</strong> TAs can inspect the repository commit history to verify equal collaboration, individual code contributions, and incremental component development across all team members.
+  </div>
+
+  <h2>2. Design and Development Methodology</h2>
+  <h3>Methodology Evolution</h3>
+  <p>Our team continues to utilize an <strong>Agile development methodology with Scrum sprints</strong>, building directly upon the architectural foundations established in Assignment 1 (A1). While A1 focused on high-level system boundaries, key domain actors (Students, Staff, Administrators), and external integration points (such as the notification service), <strong>Assignment 2 translates those abstract specifications into a fully interactive, component-driven front-end user interface</strong>.</p>
+  
+  <h3>Sprint Focus & Task Division</h3>
+  <p>To manage project scope effectively across our four team members, we partitioned the application into four modular functional domains: User Authentication & Personal Dashboard, Queue Interaction & Status Tracking, Administrative Services & Controls, and Queue Control & Notification Engine. Each team member assumed complete ownership of their assigned domain, guaranteeing consistent UI styling, modular TypeScript code architecture, and clear separation of concerns.</p>
+
+  <h2>3. Front-End Technologies and Responsibilities</h2>
+  <h3>Technology Stack & Justification</h3>
+  <ul>
+    <li><strong>Framework / Library:</strong> React 19 (with TypeScript) – Chosen for component-driven architecture, declarative rendering, robust type safety, and seamless state management via React Context (<code>QueueContext</code>).</li>
+    <li><strong>Build Tooling:</strong> Vite 8 – Provides ultra-fast Hot Module Replacement (HMR) and optimized build pipelines.</li>
+    <li><strong>Routing:</strong> React Router DOM v7 – Enables clean client-side SPA navigation between User and Admin roles.</li>
+    <li><strong>Styling & Responsive Design:</strong> Modular CSS & Flexbox/Grid – Ensures total visual consistency, clean card layouts, and mobile-to-desktop responsiveness.</li>
+  </ul>
+
+  <h3>Team Member Screen & Feature Responsibilities</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>Team Member</th>
+        <th>Assigned Screens & Components</th>
+        <th>Core Responsibilities</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Samuel Sabu</strong></td>
+        <td>Authentication (<code>Login.tsx</code>, <code>Register.tsx</code>) & User Dashboard (<code>UserDashboard.tsx</code>)</td>
+        <td>Developed responsive Login and Registration flows with client-side input validation (email regex, password strength, match checks) and the central User Dashboard summarizing active line status, available services, and quick action cards.</td>
+      </tr>
+      <tr>
+        <td><strong>Jordan</strong></td>
+        <td>Join Queue (<code>JoinQueue.tsx</code>) & Queue Status (<code>QueueStatus.tsx</code>)</td>
+        <td>Implemented department service selection, dynamic estimated wait time calculations, entry validation (notes character limits), and the live Queue Status tracking screen with position counter and progress stepper.</td>
+      </tr>
+      <tr>
+        <td><strong>Chuka</strong></td>
+        <td>Admin Dashboard (<code>AdminDashboard.tsx</code>) & Service Management (<code>ServiceManagement.tsx</code>)</td>
+        <td>Built the main Admin Overview dashboard displaying open service metrics and quick queue toggles, alongside the Service Management CRUD form enforcing strict input constraints (<strong>100-character name limit</strong>, positive duration).</td>
+      </tr>
+      <tr>
+        <td><strong>Luis</strong></td>
+        <td>Queue Management (<code>QueueManagement.tsx</code>) & Notification Component (<code>Notification.tsx</code>)</td>
+        <td>Engineered the administrative Queue Management interface (permitting simulated user reordering, serving, and removal) and created the real-time in-app notification toast alert component.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>4. Screenshots of Front-End Interfaces</h2>
+
+  <div class="figure-title">Figure 1: Login and Registration Screens</div>
+  <p><em>Developed by: Samuel Sabu</em></p>
+  <p>Features live client-side input validation for email syntax and password strength, pre-populated demo account buttons (<code>user@queuesmart.com</code> / <code>password123</code>), and registration password matching.</p>
+  <pre>+-----------------------------------------------------------------------------------+
+|                                 LOG IN TO QUEUESMART                              |
+|  Email Address: [ user@queuesmart.com                                           ] |
+|  Password:      [ ••••••••••••                                                  ] |
+|  [ LOG IN BUTTON ]                                                                |
++-----------------------------------------------------------------------------------+</pre>
+
+  <div class="figure-title">Figure 2: User Dashboard</div>
+  <p><em>Developed by: Samuel Sabu</em></p>
+  <p>Displays an Active Queue Reservation card with live position badge (#1), status badge ("Being Served"), estimated wait time, available services grid, and quick actions.</p>
+  <pre>+-----------------------------------------------------------------------------------+
+| 🔵 ACTIVE QUEUE RESERVATION: Academic Advising | Ticket #TICK-101 | POS: #1 | NOW    |
+| [ Available Services Grid ]  | Academic Advising (3 in line) | Financial Aid      |
++-----------------------------------------------------------------------------------+</pre>
+
+  <div class="figure-title">Figure 3: Join Queue Screen</div>
+  <p><em>Developed by: Jordan</em></p>
+  <p>Interactive service picker with dynamic wait time estimation (&times; average duration) and form validation enforcing a <strong>max 200-character limit counter</strong> on visit notes.</p>
+  <pre>+-----------------------------------------------------------------------------------+
+| 1. Select Service: (*) Academic Advising (~45 min wait)                           |
+| 2. Details: Full Name, Student ID, Reason (42 / 200 chars) [ 🚀 CONFIRM & JOIN ]   |
++-----------------------------------------------------------------------------------+</pre>
+
+  <div class="figure-title">Figure 4: Queue Status Screen</div>
+  <p><em>Developed by: Jordan</em></p>
+  <p>Real-time position counter badge (#2 in line), remaining wait time countdown, 4-stage progression stepper bar, leave line modal, and demo advancement controls.</p>
+
+  <div class="figure-title">Figure 5: Admin Dashboard</div>
+  <p><em>Developed by: Chuka</em></p>
+  <p>High-level metrics cards (Open Services, People Waiting, Avg Wait Time) and live Open/Close service queue toggles with immediate user notification feedback.</p>
+
+  <div class="figure-title">Figure 6: Service Management Screen</div>
+  <p><em>Developed by: Chuka</em></p>
+  <p>Full service CRUD form with strict client-side validations enforcing a <strong>max 100-character name limit with character counter</strong> and positive duration parameters.</p>
+
+  <div class="figure-title">Figure 7: Queue Management Screen</div>
+  <p><em>Developed by: Luis</em></p>
+  <p>Department tabs, "Serve Next Student" button with notification trigger, queue reordering controls (&blackupperthree-cornered-snowflake; Move Up, &blacklowerthree-cornered-snowflake; Move Down), and student removal reason modal.</p>
+
+  <h2>5. Team Contribution Table</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Group Member Name</th>
+        <th>What is your contribution?</th>
+        <th>Discussion Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Samuel Sabu</strong></td>
+        <td>Designed and coded authentication flows and the primary User Dashboard; integrated TypeScript components and local form validations.</td>
+        <td>Collaborated on global UI styling consistency, role switching, and route layout structure.</td>
+      </tr>
+      <tr>
+        <td><strong>Jordan</strong></td>
+        <td>Built the Join Queue and live Queue Status screens, implementing mock state management for estimated wait times and position trackers.</td>
+        <td>Reviewed user journey ergonomics to ensure smooth transitions from browsing services to tracking wait times.</td>
+      </tr>
+      <tr>
+        <td><strong>Chuka</strong></td>
+        <td>Developed the Admin Dashboard and Service Management CRUD interface, ensuring input constraints match requirements (100-character name limit, duration parameters).</td>
+        <td>Defined administrative permission boundaries and quick-action triggers for queue control.</td>
+      </tr>
+      <tr>
+        <td><strong>Luis</strong></td>
+        <td>Programmed the administrative Queue Management interface (simulate serving/reordering) and the UI notification alert component.</td>
+        <td>Tested real-time feedback loop behaviors for simulated status changes and queue updates.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>6. Teammate Setup Guide</h2>
+  <ol>
+    <li><strong>Clone repo:</strong> <code>git clone https://github.com/chukanwobu/cosc4353group34project.git</code></li>
+    <li><strong>Install dependencies:</strong> <code>npm install</code></li>
+    <li><strong>Run development server:</strong> <code>npm run dev</code></li>
+    <li><strong>Open browser:</strong> Navigate to <code>http://localhost:5173/</code></li>
+  </ol>
+
+</body>
+</html>

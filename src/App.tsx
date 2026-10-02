@@ -1,4 +1,7 @@
 import { Routes, Route } from 'react-router-dom'
+import { QueueProvider } from './context/QueueContext'
+import Navbar from './components/Navbar'
+import Notification from './components/Notification'
 
 import Login from './pages/auth/Login'
 import Register from './pages/auth/Register'
@@ -14,19 +17,28 @@ import QueueManagement from './pages/admin/QueueManagement'
 
 function App() {
   return (
-    <Routes>
-      <Route path="/" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+    <QueueProvider>
+      <div className="app-layout">
+        <Navbar />
+        <Notification />
+        <main className="app-content">
+          <Routes>
+            <Route path="/" element={<Login />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
 
-      <Route path="/dashboard" element={<UserDashboard />} />
-      <Route path="/join-queue" element={<JoinQueue />} />
-      <Route path="/queue-status" element={<QueueStatus />} />
-      <Route path="/history" element={<History />} />
+            <Route path="/dashboard" element={<UserDashboard />} />
+            <Route path="/join-queue" element={<JoinQueue />} />
+            <Route path="/queue-status" element={<QueueStatus />} />
+            <Route path="/history" element={<History />} />
 
-      <Route path="/admin" element={<AdminDashboard />} />
-      <Route path="/admin/services" element={<ServiceManagement />} />
-      <Route path="/admin/queue" element={<QueueManagement />} />
-    </Routes>
+            <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/services" element={<ServiceManagement />} />
+            <Route path="/admin/queue" element={<QueueManagement />} />
+          </Routes>
+        </main>
+      </div>
+    </QueueProvider>
   )
 }
 
