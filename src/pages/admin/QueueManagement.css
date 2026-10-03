@@ -1,31 +1,62 @@
+/* ==========================================================================
+   QUEUE MANAGEMENT (ADMIN VIEW)
+   --------------------------------------------------------------------------
+   Sections:
+     1. Page Layout & Header
+     2. Service Tabs
+     3. Queue Control Card
+     4. Currently Serving Banner
+     5. Queue Table
+     6. Row Action Buttons (reorder / remove)
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. PAGE LAYOUT & HEADER
+   ========================================================================== */
+
+/* Main page container: centered, stacked vertically with even spacing */
 .queue-management {
   max-width: 1200px;
   margin: 0 auto;
   padding: 2rem 1.5rem;
+
   display: flex;
   flex-direction: column;
   gap: 1.75rem;
 }
 
+/* Page title row: heading on the left, optional actions on the right */
 .queue-management-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+
   border-bottom: 2px solid #e2e8f0;
   padding-bottom: 1rem;
 
+  /* Page title */
   h1 {
     font-size: 1.875rem;
     font-weight: 700;
     color: #0f172a;
     margin: 0 0 0.25rem 0;
   }
+
+  /* Subtitle / description */
   p {
     color: #64748b;
     margin: 0;
   }
 }
 
+
+/* ==========================================================================
+   2. SERVICE TABS
+   Horizontal row of buttons used to switch between services/queues
+   ========================================================================== */
+
+/* Scrollable tab strip (scrolls sideways if tabs overflow) */
 .service-tabs {
   display: flex;
   gap: 0.75rem;
@@ -33,14 +64,17 @@
   padding-bottom: 0.5rem;
 }
 
+/* Default (inactive) tab */
 .tab-btn {
   background-color: #ffffff;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   padding: 0.65rem 1rem;
+
   display: flex;
   align-items: center;
   gap: 0.5rem;
+
   font-weight: 600;
   color: #475569;
   cursor: pointer;
@@ -53,16 +87,19 @@
   }
 }
 
+/* Active (selected) tab: solid blue fill */
 .tab-btn--active {
   background-color: #2563eb;
   color: #ffffff;
   border-color: #2563eb;
 
+  /* Keep text white on hover instead of switching to blue */
   &:hover {
     color: #ffffff;
   }
 }
 
+/* Small pill inside a tab (e.g., number of people waiting) */
 .tab-badge {
   background-color: rgba(0, 0, 0, 0.1);
   padding: 0.15rem 0.5rem;
@@ -70,28 +107,38 @@
   font-size: 0.75rem;
 }
 
+/* Badge styling when its parent tab is active */
 .tab-btn--active .tab-badge {
   background-color: rgba(255, 255, 255, 0.25);
   color: #ffffff;
 }
 
-/* Control Card */
+
+/* ==========================================================================
+   3. QUEUE CONTROL CARD
+   White card that holds the selected service's controls and queue
+   ========================================================================== */
+
+/* Card container */
 .queue-control-card {
   background-color: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 14px;
   padding: 1.75rem;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
 }
 
+/* Card header: service name on the left, "Serve Next" button on the right */
 .control-card-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 
+  /* Service name */
   h2 {
     font-size: 1.35rem;
     font-weight: 700;
@@ -100,45 +147,58 @@
   }
 }
 
+/* Small descriptive text under the service name */
 .service-subtext {
   margin: 0.25rem 0 0 0;
   font-size: 0.85rem;
   color: #64748b;
 }
 
+/* Primary action: call the next person in line */
 .btn-serve-next {
   background-color: #10b981;
   color: white;
   border: none;
   padding: 0.75rem 1.25rem;
   border-radius: 8px;
+
   font-weight: 700;
   font-size: 0.95rem;
   cursor: pointer;
   box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.25);
 
+  /* Darken on hover (only when enabled) */
   &:hover:not(:disabled) {
     background-color: #059669;
   }
 
+  /* Disabled state, e.g., when the queue is empty */
   &:disabled {
     opacity: 0.5;
     cursor: not-allowed;
   }
 }
 
-/* Currently Serving Banner */
+
+/* ==========================================================================
+   4. CURRENTLY SERVING BANNER
+   Green banner showing the person who is being served right now
+   ========================================================================== */
+
+/* Banner container */
 .currently-serving-banner {
   background: linear-gradient(135deg, #065f46 0%, #047857 100%);
   color: #ffffff;
   border-radius: 12px;
   padding: 1.25rem;
+
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 1.5rem;
 }
 
+/* "NOW SERVING" label */
 .serving-tag {
   font-size: 0.75rem;
   font-weight: 800;
@@ -149,10 +209,12 @@
   letter-spacing: 0.05em;
 }
 
+/* Text block (fills the remaining space beside the button) */
 .serving-details {
   flex: 1;
 }
 
+/* Top line: ticket ID, name, and ID number in a row */
 .serving-main {
   display: flex;
   align-items: center;
@@ -160,6 +222,7 @@
   margin-bottom: 0.25rem;
 }
 
+/* Ticket ID (monospace chip) */
 .serving-id {
   font-family: monospace;
   font-weight: 700;
@@ -169,28 +232,33 @@
   border-radius: 4px;
 }
 
+/* Person's name */
 .serving-name {
   font-size: 1.2rem;
   font-weight: 800;
 }
 
+/* Person's ID number (muted green) */
 .serving-idnum {
   font-size: 0.85rem;
   color: #a7f3d0;
 }
 
+/* Optional notes line */
 .serving-notes {
   margin: 0;
   font-size: 0.85rem;
   color: #ecfdf5;
 }
 
+/* "Complete" button: white on green banner */
 .btn-complete-service {
   background-color: #ffffff;
   color: #047857;
   border: none;
   padding: 0.65rem 1.1rem;
   border-radius: 8px;
+
   font-weight: 700;
   font-size: 0.9rem;
   cursor: pointer;
@@ -200,7 +268,12 @@
   }
 }
 
-/* Table */
+
+/* ==========================================================================
+   5. QUEUE TABLE
+   ========================================================================== */
+
+/* Placeholder shown when nobody is in the queue */
 .empty-queue-msg {
   background-color: #f8fafc;
   border: 2px dashed #cbd5e1;
@@ -210,15 +283,18 @@
   color: #64748b;
 }
 
+/* Lets the table scroll sideways on narrow screens */
 .queue-table-wrapper {
   overflow-x: auto;
 }
 
+/* Table base styles */
 .admin-queue-table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
 
+  /* Shared cell spacing and row divider */
   th,
   td {
     padding: 0.85rem 1rem;
@@ -226,6 +302,7 @@
     font-size: 0.875rem;
   }
 
+  /* Column headers */
   th {
     background-color: #f8fafc;
     color: #475569;
@@ -235,6 +312,9 @@
   }
 }
 
+/* --- Individual column/cell styles --- */
+
+/* Position in line (blue pill) */
 .pos-badge {
   background-color: #e0f2fe;
   color: #0369a1;
@@ -243,35 +323,47 @@
   border-radius: 6px;
 }
 
+/* Ticket number (monospace, blue) */
 .ticket-cell {
   font-family: monospace;
   color: #2563eb;
 }
 
+/* Person's name (bold, dark) */
 .name-cell {
   font-weight: 600;
   color: #0f172a;
 }
 
+/* ID number (muted) */
 .id-cell {
   color: #64748b;
 }
 
+/* Notes (width-capped so long text wraps) */
 .notes-cell {
   color: #475569;
   max-width: 250px;
 }
 
+/* Estimated wait time (green) */
 .wait-cell {
   font-weight: 600;
   color: #059669;
 }
 
+
+/* ==========================================================================
+   6. ROW ACTION BUTTONS
+   ========================================================================== */
+
+/* Container for the move up / move down buttons */
 .reorder-cell {
   display: flex;
   gap: 0.35rem;
 }
 
+/* Small square button for moving a person up or down in the queue */
 .btn-reorder {
   background-color: #f1f5f9;
   border: 1px solid #cbd5e1;
@@ -279,34 +371,41 @@
   width: 28px;
   height: 28px;
   border-radius: 4px;
+
   display: flex;
   align-items: center;
   justify-content: center;
+
   cursor: pointer;
   font-size: 0.75rem;
 
+  /* Turns blue on hover (only when enabled) */
   &:hover:not(:disabled) {
     background-color: #2563eb;
     color: white;
     border-color: #2563eb;
   }
 
+  /* Disabled, e.g., first row can't move up, last row can't move down */
   &:disabled {
     opacity: 0.3;
     cursor: not-allowed;
   }
 }
 
+/* Red "Remove" button for taking someone out of the queue */
 .btn-remove-user {
   background-color: #fef2f2;
   color: #dc2626;
   border: 1px solid #fecaca;
   padding: 0.35rem 0.75rem;
   border-radius: 6px;
+
   font-weight: 600;
   font-size: 0.8rem;
   cursor: pointer;
 
+  /* Fills solid red on hover for emphasis */
   &:hover {
     background-color: #dc2626;
     color: white;
