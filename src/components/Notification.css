@@ -1,54 +1,111 @@
+/* ==========================================================================
+   NOTIFICATION (TOAST) STYLES
+   --------------------------------------------------------------------------
+   Sections:
+     1. Toast Container
+     2. Toast Base Style
+     3. Toast Type Variants (success / warning / alert / info)
+     4. Toast Inner Elements (icon, content, message, time, close button)
+     5. Animations
+   ========================================================================== */
+
+
+/* ==========================================================================
+   1. TOAST CONTAINER
+   Fixed stack of toasts pinned to the top-right of the screen
+   ========================================================================== */
+
 .notification-container {
+  /* Pin to the top-right corner, above all other content */
   position: fixed;
   top: 1rem;
   right: 1rem;
   z-index: 9999;
+
+  /* Stack toasts vertically with a small gap */
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
+
+  /* Full width on small screens (minus side margins), capped at 400px */
   max-width: 400px;
   width: calc(100% - 2rem);
+
+  /* Let clicks pass through empty space; toasts re-enable this themselves */
   pointer-events: none;
 }
 
+
+/* ==========================================================================
+   2. TOAST BASE STYLE
+   Shared look for every toast; the left border color is set per type below
+   ========================================================================== */
+
 .notification-toast {
+  /* Re-enable clicks (the container disables them) */
   pointer-events: auto;
+
+  /* Layout: icon | content | close button in a row */
   display: flex;
   align-items: flex-start;
   gap: 0.75rem;
   padding: 0.875rem 1rem;
+
+  /* Card appearance */
   border-radius: 8px;
   background-color: #ffffff;
   box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+
+  /* Colored accent bar on the left (default blue, overridden by type modifiers) */
   border-left: 5px solid #3b82f6;
+
+  /* Slide in from the right when the toast appears (see @keyframes below) */
   animation: slideInRight 0.3s ease-out forwards;
 }
 
+
+/* ==========================================================================
+   3. TOAST TYPE VARIANTS
+   Each modifier only changes the accent color on the left border
+   ========================================================================== */
+
+/* Success: green */
 .notification-toast--success {
   border-left-color: #10b981;
 }
 
+/* Warning: amber */
 .notification-toast--warning {
   border-left-color: #f59e0b;
 }
 
+/* Alert: red */
 .notification-toast--alert {
   border-left-color: #ef4444;
 }
 
+/* Info: blue (same as the default) */
 .notification-toast--info {
   border-left-color: #3b82f6;
 }
 
+
+/* ==========================================================================
+   4. TOAST INNER ELEMENTS
+   ========================================================================== */
+
+/* Icon (emoji/symbol) on the left */
 .notification-toast__icon {
   font-size: 1.1rem;
   line-height: 1;
 }
 
+/* Text area: expands to fill the space between the icon and close button */
 .notification-toast__content {
   flex: 1;
 }
 
+/* Notification message */
 .notification-toast__message {
   margin: 0;
   font-size: 0.9rem;
@@ -57,6 +114,7 @@
   line-height: 1.35;
 }
 
+/* Timestamp shown under the message (muted) */
 .notification-toast__time {
   display: block;
   font-size: 0.75rem;
@@ -64,6 +122,7 @@
   margin-top: 0.25rem;
 }
 
+/* Close (×) button: plain text-style button with no background or border */
 .notification-toast__close {
   background: none;
   border: none;
@@ -75,15 +134,24 @@
   transition: color 0.15s ease;
 }
 
+/* Darken the close button on hover */
 .notification-toast__close:hover {
   color: #374151;
 }
 
+
+/* ==========================================================================
+   5. ANIMATIONS
+   ========================================================================== */
+
+/* Toast entrance: starts off-screen to the right and transparent,
+   then slides into place and fades in */
 @keyframes slideInRight {
   from {
     transform: translateX(100%);
     opacity: 0;
   }
+
   to {
     transform: translateX(0);
     opacity: 1;
