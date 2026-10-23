@@ -33,7 +33,15 @@ export type NotificationItem = {
   timestamp: string
 }
 
-type UserRole = 'user' | 'admin'
+export type UserRole = 'user' | 'admin'
+
+export interface AuthUser {
+  id: string
+  email: string
+  name: string
+  role: UserRole
+  studentId?: string
+}
 
 interface QueueContextType {
   services: Service[]
@@ -42,6 +50,8 @@ interface QueueContextType {
   notifications: NotificationItem[]
   currentRole: UserRole
   setCurrentRole: (role: UserRole) => void
+  currentUser: AuthUser | null
+  setCurrentUser: (user: AuthUser | null) => void
   addNotification: (message: string, type?: NotificationItem['type']) => void
   removeNotification: (id: string) => void
   toggleServiceStatus: (id: number) => void
@@ -184,6 +194,13 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     },
   ])
   const [currentRole, setCurrentRole] = useState<UserRole>('user')
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>({
+    id: 'usr-1',
+    email: 'user@queuesmart.com',
+    name: 'Samuel Sabu',
+    role: 'user',
+    studentId: '1984203',
+  })
 
   const addNotification = (message: string, type: NotificationItem['type'] = 'info') => {
     const newNotif: NotificationItem = {
@@ -421,6 +438,8 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         notifications,
         currentRole,
         setCurrentRole,
+        currentUser,
+        setCurrentUser,
         addNotification,
         removeNotification,
         toggleServiceStatus,

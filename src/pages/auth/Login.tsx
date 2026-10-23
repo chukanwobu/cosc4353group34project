@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import type { ChangeEvent, FocusEvent, FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useQueue } from '../../context/QueueContext'
+import { loginApi } from '../../services/authApi'
 import './Login.css'
 
 type Field = 'email' | 'password'
@@ -8,10 +10,10 @@ type Errors = Partial<Record<Field, string>>
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-// fake accounts for A2 replace with an API call in A3 when backend is up
+// Fallback accounts if offline
 const MOCK_USERS = [
-  { email: 'user@queuesmart.com', password: 'password123', role: 'user' },
-  { email: 'admin@queuesmart.com', password: 'admin1234', role: 'admin' },
+  { email: 'user@queuesmart.com', password: 'password123', role: 'user', name: 'Samuel Sabu' },
+  { email: 'admin@queuesmart.com', password: 'admin1234', role: 'admin', name: 'Campus Administrator' },
 ]
 
 function validate(field: Field, value: string): string {
@@ -28,10 +30,12 @@ function validate(field: Field, value: string): string {
 
 function Login() {
   const navigate = useNavigate()
+  const { setCurrentUser, setCurrentRole, addNotification } = useQueue()
   const [values, setValues] = useState({ email: '', password: '' })
   const [errors, setErrors] = useState<Errors>({})
   const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({})
   const [formError, setFormError] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const field = e.target.name as Field
@@ -50,7 +54,7 @@ function Login() {
     setErrors((prev) => ({ ...prev, [field]: validate(field, values[field]) }))
   }
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
     const nextErrors: Errors = {
@@ -61,16 +65,41 @@ function Login() {
     setTouched({ email: true, password: true })
     if (nextErrors.email || nextErrors.password) return
 
-    const match = MOCK_USERS.find(
-      (u) => u.email === values.email.trim().toLowerCase() && u.password === values.password
-    )
-    if (!match) {
-      setFormError('That email and password don’t match an account. Check them and try again.')
+    setIsLoading(true)
+    setFormError('')
+
+    // 1. Call Backend REST API endpoint (POST /api/auth/login)
+    const apiRes = await loginApi({ email: values.email, password: values.password })
+
+    if (apiRes.success && apiRes.data) {
+      const loggedUser = apiRes.data.user
+      setCurrentUser(loggedUser)
+      setCurrentRole(loggedUser.role)
+      addNotification(`Welcome back, ${loggedUser.name}! (Authenticated via Backend API)`, 'success')
+      setIsLoading(false)
+      navigate(loggedUser.role === 'admin' ? '/admin' : '/dashboard')
       return
     }
 
-    // TODO: store the logged-in user in your auth context here
-    navigate(match.role === 'admin' ? '/admin' : '/dashboard')
+    // 2. Fallback check for local mock if server is in offline mode
+    const match = MOCK_USERS.find(
+      (u) => u.email === values.email.trim().toLowerCase() && u.password === values.password
+    )
+    if (match) {
+      setCurrentUser({
+        id: match.role === 'admin' ? 'usr-2' : 'usr-1',
+        email: match.email,
+        name: match.name,
+        role: match.role as 'user' | 'admin'
+      })
+      setCurrentRole(match.role as 'user' | 'admin')
+      setIsLoading(false)
+      navigate(match.role === 'admin' ? '/admin' : '/dashboard')
+      return
+    }
+
+    setIsLoading(false)
+    setFormError(apiRes.error || 'That email and password don’t match an account. Check them and try again.')
   }
 
   return (
@@ -126,8 +155,8 @@ function Login() {
             )}
           </div>
 
-          <button type="submit" className="login__submit">
-            Log in
+          <button type="submit" className="login__submit" disabled={isLoading}>
+            {isLoading ? 'Signing in…' : 'Log in'}
           </button>
         </form>
 

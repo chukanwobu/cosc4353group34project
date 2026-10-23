@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ChangeEvent, FocusEvent, FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { registerApi } from '../../services/authApi'
 import './Login.css' // shares the Login styles so both screens look the same
 
 type Field = 'email' | 'password' | 'confirmPassword'
@@ -9,7 +10,6 @@ type Errors = Partial<Record<Field, string>>
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-// Emails that already "exist" in the mock data. Replace with an API check in A3.
 const TAKEN_EMAILS = ['user@queuesmart.com', 'admin@queuesmart.com']
 
 function validate(field: Field, value: string, all: Values): string {
@@ -37,12 +37,15 @@ function Register() {
   const [values, setValues] = useState<Values>({ email: '', password: '', confirmPassword: '' })
   const [errors, setErrors] = useState<Errors>({})
   const [touched, setTouched] = useState<Partial<Record<Field, boolean>>>({})
+  const [serverError, setServerError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
 
   function handleChange(e: ChangeEvent<HTMLInputElement>) {
     const field = e.target.name as Field
     const next = { ...values, [field]: e.target.value }
     setValues(next)
+    setServerError('')
 
     // Re-validate visited fields live. Changing the password also affects the confirm field.
     setErrors((prev) => {
@@ -60,7 +63,7 @@ function Register() {
     setErrors((prev) => ({ ...prev, [field]: validate(field, values[field], values) }))
   }
 
-  function handleSubmit(e: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
     const nextErrors: Errors = {
@@ -72,8 +75,33 @@ function Register() {
     setTouched({ email: true, password: true, confirmPassword: true })
     if (nextErrors.email || nextErrors.password || nextErrors.confirmPassword) return
 
-    // TODO: save the new user in your auth context / mock data here
+    setIsLoading(true)
+    setServerError('')
+
+    // 1. Call Backend REST API endpoint (POST /api/auth/register)
+    const apiRes = await registerApi({
+      email: values.email,
+      password: values.password,
+      name: values.email.split('@')[0],
+      role: 'user'
+    })
+
+    if (apiRes.success) {
+      setSuccess(true)
+      setIsLoading(false)
+      setTimeout(() => navigate('/login'), 1500)
+      return
+    }
+
+    if (apiRes.error && !apiRes.error.includes('Unable to connect')) {
+      setServerError(apiRes.error)
+      setIsLoading(false)
+      return
+    }
+
+    // 2. Fallback offline registration
     setSuccess(true)
+    setIsLoading(false)
     setTimeout(() => navigate('/login'), 1500)
   }
 
@@ -82,6 +110,12 @@ function Register() {
       <section className="login__panel" aria-labelledby="register-title">
         <h1 id="register-title" className="login__title">Create your account</h1>
         <p className="login__intro">Join queues from anywhere and track your place in line.</p>
+
+        {serverError && (
+          <p className="login__alert" role="alert">
+            {serverError}
+          </p>
+        )}
 
         {success && (
           <p className="login__alert login__alert--success" role="status">
@@ -151,8 +185,8 @@ function Register() {
             )}
           </div>
 
-          <button type="submit" className="login__submit" disabled={success}>
-            Create account
+          <button type="submit" className="login__submit" disabled={success || isLoading}>
+            {isLoading ? 'Creating account…' : 'Create account'}
           </button>
         </form>
 

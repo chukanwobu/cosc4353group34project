@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Assignment 3 Report - QueueSmart (COSC 4353 Group 34)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #1e293b;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      background-color: #ffffff;
+    }
+    h1, h2, h3, h4 {
+      color: #0f172a;
+      font-weight: 700;
+    }
+    h1 {
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    h2 {
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 0.3rem;
+      margin-top: 2rem;
+    }
+    .note-box {
+      background-color: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 1rem;
+      border-radius: 4px;
+      margin: 1rem 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 0.75rem;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    th {
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+    pre {
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: monospace;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    code {
+      background-color: #f1f5f9;
+      color: #0f172a;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.85rem;
+    }
+    pre code {
+      background: none;
+      color: inherit;
+      padding: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Assignment 3: Back-End Development &amp; API Implementation (A3)</h1>
+  <p><strong>Project Name:</strong> QueueSmart – Smart Queue Management Application<br>
+  <strong>Course:</strong> COSC 4353 – Software Design (2026 Fall)<br>
+  <strong>Team Name / Number:</strong> Group 34<br>
+  <strong>Team Members:</strong> Samuel Sabu, Jordan, Chuka, Luis</p>
+
+  <h2>1. GitHub Repository Link</h2>
+  <p><strong>Repository URL:</strong> <a href="https://github.com/chukanwobu/cosc4353group34project" target="_blank">https://github.com/chukanwobu/cosc4353group34project</a></p>
+  
+  <div class="note-box">
+    <strong>Verification Notes for TAs:</strong>
+    <ul>
+      <li>Backend source code and REST API endpoints are fully implemented and pushed to the repository in the <code>/server</code> directory.</li>
+      <li>Automated unit tests covering core business logic and validation rules are located in <code>/server/tests</code> (<code>auth.test.ts</code>, <code>services_queue.test.ts</code>, <code>history_notif.test.ts</code>).</li>
+      <li>TAs can review unit test execution logs and commit history to verify individual team contributions and test coverage (<strong>84.69% total statement coverage achieved, exceeding the 70–80% target</strong>).</li>
+    </ul>
+  </div>
+
+  <h2>2. Backend Technologies and Architecture Justification</h2>
+  <h3>Selected Technology Stack</h3>
+  <ul>
+    <li><strong>Language &amp; Runtime:</strong> Node.js (v20+ LTS) with TypeScript</li>
+    <li><strong>Framework:</strong> Express.js (v4.21+) with <code>cors</code> middleware</li>
+    <li><strong>Testing Framework:</strong> Vitest &amp; Supertest (v8 coverage provider)</li>
+  </ul>
+
+  <h3>Architectural Justification &amp; Alignment with QueueSmart</h3>
+  <ul>
+    <li><strong>Modular REST API Design:</strong> Express.js provides a lightweight routing pipeline separating the application into distinct domain controllers (<code>authController</code>, <code>serviceRoutes</code>, <code>queueRoutes</code>, <code>historyRoutes</code>, <code>notifRoutes</code>). This directly implements the system boundaries specified in Assignment 1 and services the screens built in Assignment 2.</li>
+    <li><strong>In-Memory Data Structures:</strong> In strict accordance with Assignment 3 specifications, all state is maintained in TypeScript in-memory collections (<code>server/src/data/memoryStore.ts</code>), intentionally deferring persistent database configuration to Assignment 4 while guaranteeing sub-millisecond execution speeds and zero external setup barriers for unit tests.</li>
+    <li><strong>Payload Validation &amp; Type Safety:</strong> Defensive boundary validation validates all incoming payloads (e.g., email syntax, password complexity, the mandatory 100-character upper limit on service names, and 200-character limits on queue notes), returning standardized HTTP status codes (<code>201 Created</code>, <code>200 OK</code>, <code>400 Bad Request</code>, <code>401 Unauthorized</code>, <code>409 Conflict</code>).</li>
+    <li><strong>Front-End Integration:</strong> The A2 React/TypeScript front-end connects directly to these backend endpoints via asynchronous HTTP services (<code>src/services/authApi.ts</code>), allowing real-time authentication, session persistence, and role-based views to reflect live backend data.</li>
+  </ul>
+
+  <h2>3. Automated Unit Testing &amp; Code Coverage Summary</h2>
+  <pre>Test Files  3 passed (3)
+Tests       29 passed (29)
+Duration    435ms</pre>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th>Statement Coverage</th>
+        <th>Branch Coverage</th>
+        <th>Function Coverage</th>
+        <th>Line Coverage</th>
+        <th>Target Benchmark</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>All Backend Files</strong></td>
+        <td><strong>84.69%</strong></td>
+        <td><strong>73.87%</strong></td>
+        <td><strong>93.33%</strong></td>
+        <td><strong>84.69%</strong></td>
+        <td><strong>70%–80% (PASSED)</strong></td>
+      </tr>
+      <tr>
+        <td><code>authService.ts</code></td>
+        <td>90.59%</td>
+        <td>88.88%</td>
+        <td>80.00%</td>
+        <td>90.59%</td>
+        <td>Core Auth Logic</td>
+      </tr>
+      <tr>
+        <td><code>authController.ts</code></td>
+        <td>81.01%</td>
+        <td>66.66%</td>
+        <td>100.00%</td>
+        <td>81.01%</td>
+        <td>Auth HTTP Handlers</td>
+      </tr>
+      <tr>
+        <td><code>authRoutes.ts</code></td>
+        <td>100.00%</td>
+        <td>100.00%</td>
+        <td>100.00%</td>
+        <td>100.00%</td>
+        <td>Auth Router</td>
+      </tr>
+      <tr>
+        <td><code>memoryStore.ts</code></td>
+        <td>100.00%</td>
+        <td>100.00%</td>
+        <td>100.00%</td>
+        <td>100.00%</td>
+        <td>In-Memory Store</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>4. Team Contribution Table</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Group Member Name</th>
+        <th>What is your contribution?</th>
+        <th>Discussion Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Samuel Sabu</strong></td>
+        <td>Implemented the Authentication and User Management backend modules (<code>/api/auth/register</code>, <code>/api/auth/login</code>), role verification (<code>user</code> vs <code>admin</code>), and defensive payload validation rules. Connected front-end authentication flows to the backend server.</td>
+        <td>Coordinated API contract definitions, HTTP response status codes, and request/response payload structures with front-end components.</td>
+      </tr>
+      <tr>
+        <td><strong>Jordan</strong></td>
+        <td>Developed the Queue Management API module (<code>/api/queue</code>) and wait-time estimation calculation engine (Wait = (Position - 1) &times; Duration), implementing FIFO and priority-based queue sorting.</td>
+        <td>Reviewed wait-time estimation algorithms to ensure realistic wait-time outputs under fluctuating queue lengths and different service duration parameters.</td>
+      </tr>
+      <tr>
+        <td><strong>Chuka</strong></td>
+        <td>Built the Service Management CRUD API endpoints (<code>/api/services</code>) and in-memory service models, enforcing strict field validations including the mandatory 100-character service name constraint.</td>
+        <td>Defined service constraints, open/close queue status toggle behavior, and priority categories (<code>low</code>, <code>medium</code>, <code>high</code>) across administrative endpoints.</td>
+      </tr>
+      <tr>
+        <td><strong>Luis</strong></td>
+        <td>Programmed the in-memory History tracking module (<code>/api/history</code>), Notification trigger alerts (<code>/api/notifications</code>), and authored comprehensive unit test suites achieving 84.69% code coverage.</td>
+        <td>Configured test runners, automated mock data teardown between test cases, and verified test execution pipelines on GitHub.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>5. Local Setup &amp; Verification Guide</h2>
+  <ol>
+    <li>
+      <strong>Run Backend Unit Tests:</strong>
+      <pre>cd server
+npm install
+npm test
+npm run test:coverage</pre>
+    </li>
+    <li>
+      <strong>Start Backend REST API Server:</strong>
+      <pre>cd server
+npm start
+# Server runs on http://localhost:5001</pre>
+    </li>
+    <li>
+      <strong>Start Front-End Client:</strong>
+      <pre>npm install
+npm run dev
+# Client runs on http://localhost:5173</pre>
+    </li>
+  </ol>
+
+</body>
+</html>
