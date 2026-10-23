@@ -52,6 +52,79 @@ describe('Service & Queue Backend Modules', () => {
       expect(res.status).toBe(200)
       expect(res.body.data.isOpen).toBe(false)
     })
+
+    
+    it('should update an existing service', async () => {
+      const updatedService = {
+        name: 'Academic Advising Center',
+        description: 'Updated academic advising services.',
+        duration: 25,
+        priority: 'high'
+      }
+
+      const res = await request(app)
+        .put('/api/services/1')
+        .send(updatedService)
+
+      expect(res.status).toBe(200)
+      expect(res.body.success).toBe(true)
+      expect(res.body.data.name).toBe('Academic Advising Center')
+      expect(res.body.data.duration).toBe(25)
+
+      const savedService = store.services.find(
+        (service) => service.id === 1
+      )
+
+      expect(savedService?.name).toBe('Academic Advising Center')
+    })
+
+    
+    it('should reject invalid service updates', async () => {
+      const res = await request(app)
+        .put('/api/services/1')
+        .send({
+          name: 'A'.repeat(101),
+          description: 'Updated description',
+          duration: 0,
+          priority: 'invalid'
+        })
+
+      expect(res.status).toBe(400)
+      expect(res.body.success).toBe(false)
+      expect(res.body.details.name).toBeDefined()
+      expect(res.body.details.duration).toBeDefined()
+      expect(res.body.details.priority).toBeDefined()
+    })
+
+    it('should return 404 when updating a nonexistent service', async () => {
+      const res = await request(app)
+        .put('/api/services/99999')
+        .send({
+          name: 'New Service',
+          description: 'Test description',
+          duration: 20,
+          priority: 'medium'
+        })
+
+      expect(res.status).toBe(404)
+      expect(res.body.success).toBe(false)
+    })
+
+    it('should reject fractional service durations', async () => {
+      const res = await request(app)
+        .post('/api/services')
+        .send({
+          name: 'Career Counseling',
+          description: 'Career planning assistance',
+          duration: 2.5,
+          priority: 'medium'
+        })
+
+      expect(res.status).toBe(400)
+      expect(res.body.success).toBe(false)
+      expect(res.body.details.duration).toBeDefined()
+    })
+
   })
 
   describe('Queue Management Endpoints (/api/queue)', () => {

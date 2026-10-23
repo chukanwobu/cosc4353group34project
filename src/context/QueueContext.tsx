@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react'
+import React, { createContext, useContext, useEffect, useState } from 'react'
 
 export type Priority = 'low' | 'medium' | 'high'
 
@@ -183,6 +183,29 @@ const QueueContext = createContext<QueueContextType | undefined>(undefined)
 
 export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [services, setServices] = useState<Service[]>(initialServices)
+  
+  useEffect(() => {
+    const fetchServices = async () => {
+      try {
+        const response = await fetch('/api/services')
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch services')
+        }
+
+        const result = await response.json()
+
+        if (result.success) {
+          setServices(result.data)
+        }
+      } catch (error) {
+        console.error('Error loading services:', error)
+      }
+    }
+
+    fetchServices()
+  }, [])
+
   const [tickets, setTickets] = useState<Ticket[]>(initialTickets)
   const [history, setHistory] = useState<Ticket[]>(initialHistory)
   const [notifications, setNotifications] = useState<NotificationItem[]>([
@@ -232,28 +255,102 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     )
   }
 
-  const addService = (data: Omit<Service, 'id' | 'isOpen'>) => {
-    const newService: Service = {
-      ...data,
-      id: Date.now(),
-      isOpen: true,
+  
+  const addService = async (data: Omit<Service, 'id' | 'isOpen'>) => {
+    try {
+      const response = await fetch('/api/services', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to create service')
+      }
+
+      setServices((prev) => [...prev, result.data])
+
+      addNotification(
+        `New service "${result.data.name}" added successfully.`,
+        'success'
+      )
+    } catch (error) {
+      console.error('Error creating service:', error)
+      addNotification('Failed to create service.', 'alert')
     }
-    setServices((prev) => [...prev, newService])
-    addNotification(`New service "${data.name}" added successfully.`, 'success')
   }
 
-  const updateService = (id: number, data: Omit<Service, 'id' | 'isOpen'>) => {
-    setServices((prev) =>
-      prev.map((s) => (s.id === id ? { ...s, ...data } : s))
-    )
-    addNotification(`Service "${data.name}" updated.`, 'info')
+
+  
+  const updateService = async (
+    id: number,
+    data: Omit<Service, 'id' | 'isOpen'>
+  ) => {
+    try {
+      const response = await fetch(`/api/services/${id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to update service')
+      }
+
+      setServices((prev) =>
+        prev.map((service) =>
+          service.id === id ? result.data : service
+        )
+      )
+
+      addNotification(
+        `Service "${result.data.name}" updated successfully.`,
+        'success'
+      )
+    } catch (error) {
+      console.error('Error updating service:', error)
+      addNotification('Failed to update service.', 'alert')
+    }
   }
 
-  const deleteService = (id: number) => {
-    const target = services.find((s) => s.id === id)
-    setServices((prev) => prev.filter((s) => s.id !== id))
-    if (target) addNotification(`Service "${target.name}" removed.`, 'warning')
+
+  
+  const deleteService = async (id: number) => {
+    try {
+      const response = await fetch(`/api/services/${id}`, {
+        method: 'DELETE',
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Failed to delete service')
+      }
+
+      const deletedService = services.find((service) => service.id === id)
+
+      setServices((prev) =>
+        prev.filter((service) => service.id !== id)
+      )
+
+      addNotification(
+        `Service "${deletedService?.name || 'Unknown'}" deleted successfully.`,
+        'success'
+      )
+    } catch (error) {
+      console.error('Error deleting service:', error)
+      addNotification('Failed to delete service.', 'alert')
+    }
   }
+
 
   const joinQueue = (serviceId: number, userName: string, studentId: string, notes: string): Ticket | null => {
     const targetService = services.find((s) => s.id === serviceId)

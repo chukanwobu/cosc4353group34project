@@ -27,9 +27,15 @@ router.post('/', (req: Request, res: Response) => {
     errors.description = 'Service description is required.'
   }
 
-  const numDuration = Number(duration)
-  if (!duration || isNaN(numDuration) || numDuration < 1) {
-    errors.duration = 'Expected duration must be a positive integer (minimum 1 minute).'
+  const numDuration = duration
+
+  if (
+    typeof duration !== 'number' ||
+    !Number.isInteger(duration) ||
+    duration < 1
+  ) {
+    errors.duration =
+      'Expected duration must be a positive integer (minimum 1 minute).'
   }
 
   if (!priority || !['low', 'medium', 'high'].includes(priority)) {
@@ -80,6 +86,71 @@ router.patch('/:id/toggle', (req: Request, res: Response) => {
     data: service
   })
 })
+
+
+// PUT /api/services/:id - Update an existing service
+router.put('/:id', (req: Request, res: Response) => {
+  const serviceId = Number(req.params.id)
+
+  const service = store.services.find(
+    (s) => s.id === serviceId
+  )
+
+  if (!service) {
+    res.status(404).json({
+      success: false,
+      error: 'Service not found.'
+    })
+    return
+  }
+
+  const { name, description, duration, priority } = req.body ?? {}
+
+  const errors: Record<string, string> = {}
+
+  if (typeof name !== 'string' || !name.trim()) {
+    errors.name = 'Service name is required.'
+  } else if (name.trim().length > 100) {
+    errors.name = 'Service name must not exceed 100 characters.'
+  }
+
+  if (typeof description !== 'string' || !description.trim()) {
+    errors.description = 'Service description is required.'
+  }
+
+  if (
+    typeof duration !== 'number' ||
+    !Number.isInteger(duration) ||
+    duration < 1
+  ) {
+    errors.duration = 'Duration must be a positive integer.'
+  }
+
+  if (!['low', 'medium', 'high'].includes(priority)) {
+    errors.priority = 'Invalid priority level.'
+  }
+
+  if (Object.keys(errors).length > 0) {
+    res.status(400).json({
+      success: false,
+      error: 'Validation failed.',
+      details: errors
+    })
+    return
+  }
+
+  service.name = name.trim()
+  service.description = description.trim()
+  service.duration = duration
+  service.priority = priority
+
+  res.status(200).json({
+    success: true,
+    message: 'Service successfully updated.',
+    data: service
+  })
+})
+
 
 // DELETE /api/services/:id
 router.delete('/:id', (req: Request, res: Response) => {
