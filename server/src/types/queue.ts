@@ -1,5 +1,7 @@
 export type TicketStatus = 'waiting' | 'in_progress' | 'completed' | 'cancelled'
 
+export type PriorityLevel = 'low' | 'medium' | 'high'
+
 export interface Ticket {
   id: string
   serviceId: number
@@ -10,6 +12,7 @@ export interface Ticket {
   position: number
   status: TicketStatus
   estimatedWait: number // in minutes
+  priority?: PriorityLevel
   createdAt: string
   completedAt?: string
 }
@@ -18,7 +21,8 @@ export interface JoinQueueDTO {
   serviceId: number
   userName: string
   studentId: string
-  notes: string
+    notes: string
+  Priority?: PriorityLevel
 }
 
 export interface NotificationItem {
