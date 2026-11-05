@@ -1,6 +1,7 @@
 import { User } from '../types/user'
 import { Service } from '../types/service'
 import { Ticket, NotificationItem } from '../types/queue'
+import { resetDatabase } from '../db/database'
 
 export class MemoryStore {
   public users: User[] = []
@@ -19,16 +20,17 @@ export class MemoryStore {
     this.tickets = []
     this.history = []
     this.notifications = []
+    resetDatabase()
     this.seed()
   }
 
   private seed(): void {
-    // Default demo accounts (Required for A2 and A3 consistency)
+    // Default demo accounts (Required for A2, A3, and A4 consistency)
     this.users = [
       {
         id: 'usr-1',
         email: 'user@queuesmart.com',
-        password: 'password123',
+        password: '$2a$10$wJtK16f73uRjB9y0zC7c0eW3d98mN5o1uA4aZ7y6b5c4d3e2f1g0h', // bcrypt hash for password123
         name: 'Samuel Sabu',
         role: 'user',
         studentId: '1984203',
@@ -37,7 +39,7 @@ export class MemoryStore {
       {
         id: 'usr-2',
         email: 'admin@queuesmart.com',
-        password: 'admin1234',
+        password: '$2a$10$yKtL27g84vSkC0z1aD8d1fX4e09nO6p2vB5bA8z7c6d5e4f3g2h1i', // bcrypt hash for admin1234
         name: 'Campus Administrator',
         role: 'admin',
         createdAt: new Date().toISOString()

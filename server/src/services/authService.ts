@@ -1,8 +1,22 @@
+import bcrypt from 'bcryptjs'
+import { getDb } from '../db/database'
 import { store } from '../data/memoryStore'
-import { User, RegisterDTO, LoginDTO, AuthResponse, UserRole } from '../types/user'
+import { SafeUser, RegisterDTO, LoginDTO, AuthResponse, UserRole } from '../types/user'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PASSWORD_REGEX = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/
+
+interface JoinedUserRecord {
+  user_id: string
+  email: string
+  password_hash: string
+  role: UserRole
+  full_name: string
+  student_id: string | null
+  phone: string | null
+  preferences: string | null
+  created_at: string
+}
 
 export class AuthService {
   /**
@@ -44,9 +58,9 @@ export class AuthService {
   }
 
   /**
-   * Register a new user
+   * Register a new user with encrypted password in UserCredentials and profile in UserProfile
    */
-  public register(dto: RegisterDTO): { user?: Omit<User, 'password'>; error?: string; status?: number; details?: Record<string, string> } {
+  public register(dto: RegisterDTO): { user?: SafeUser; error?: string; status?: number; details?: Record<string, string> } {
     const validation = AuthService.validateRegisterInput(dto)
     if (!validation.isValid) {
       return {
@@ -57,9 +71,10 @@ export class AuthService {
     }
 
     const normalizedEmail = dto.email.trim().toLowerCase()
+    const db = getDb()
 
-    // Duplicate email check
-    const existing = store.users.find((u) => u.email.toLowerCase() === normalizedEmail)
+    // Database uniqueness pre-check
+    const existing = db.prepare('SELECT user_id FROM UserCredentials WHERE lower(email) = ?').get(normalizedEmail) as { user_id: string } | undefined
     if (existing) {
       return {
         error: 'An account with this email address already exists. Please log in.',
@@ -67,30 +82,79 @@ export class AuthService {
       }
     }
 
+    // Password encryption via bcrypt (cost factor = 10)
+    const salt = bcrypt.genSaltSync(10)
+    const passwordHash = bcrypt.hashSync(dto.password, salt)
+
+    const userId = `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+    const profileId = `prof-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
     const assignedRole: UserRole = dto.role === 'admin' ? 'admin' : 'user'
+    const trimmedName = dto.name.trim()
+    const studentId = dto.studentId?.trim() || null
+    const phone = dto.phone?.trim() || null
+    const preferences = dto.preferences ? (typeof dto.preferences === 'string' ? dto.preferences : JSON.stringify(dto.preferences)) : '{}'
 
-    const newUser: User = {
-      id: `usr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-      email: normalizedEmail,
-      password: dto.password,
-      name: dto.name.trim(),
-      role: assignedRole,
-      studentId: dto.studentId?.trim() || undefined,
-      createdAt: new Date().toISOString()
-    }
+    const insertCred = db.prepare(`
+      INSERT INTO UserCredentials (user_id, email, password_hash, role)
+      VALUES (?, ?, ?, ?)
+    `)
 
-    store.users.push(newUser)
+    const insertProfile = db.prepare(`
+      INSERT INTO UserProfile (profile_id, user_id, full_name, email, student_id, phone, preferences)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `)
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...safeUser } = newUser
-    return {
-      user: safeUser,
-      status: 201
+    try {
+      const registerTransaction = db.transaction(() => {
+        insertCred.run(userId, normalizedEmail, passwordHash, assignedRole)
+        insertProfile.run(profileId, userId, trimmedName, normalizedEmail, studentId, phone, preferences)
+      })
+
+      registerTransaction()
+
+      const safeUser: SafeUser = {
+        id: userId,
+        email: normalizedEmail,
+        name: trimmedName,
+        role: assignedRole,
+        studentId: studentId || undefined,
+        phone: phone || undefined,
+        preferences,
+        createdAt: new Date().toISOString()
+      }
+
+      // Synchronize in-memory mirror for backward compatibility
+      store.users.push({
+        id: userId,
+        email: normalizedEmail,
+        name: trimmedName,
+        role: assignedRole,
+        studentId: studentId || undefined,
+        phone: phone || undefined,
+        preferences,
+        createdAt: safeUser.createdAt!
+      })
+
+      return {
+        user: safeUser,
+        status: 201
+      }
+    } catch (err: any) {
+      if (err.message && err.message.includes('UNIQUE constraint failed')) {
+        return {
+          error: 'An account with this email address already exists. Please log in.',
+          status: 409
+        }
+      }
+      return {
+        error: 'Database registration failed: ' + err.message,
+        status: 500
+      }
     }
   }
 
   /**
-   * Authenticate an existing user
+   * Authenticate an existing user using bcrypt password comparison against UserCredentials
    */
   public login(dto: LoginDTO): { auth?: AuthResponse; error?: string; status?: number } {
     if (!dto.email || !dto.password) {
@@ -101,16 +165,25 @@ export class AuthService {
     }
 
     const normalizedEmail = dto.email.trim().toLowerCase()
-    const user = store.users.find((u) => u.email.toLowerCase() === normalizedEmail)
+    const db = getDb()
 
-    if (!user) {
+    const record = db.prepare(`
+      SELECT c.user_id, c.email, c.password_hash, c.role, p.full_name, p.student_id, p.phone, p.preferences, c.created_at
+      FROM UserCredentials c
+      JOIN UserProfile p ON c.user_id = p.user_id
+      WHERE lower(c.email) = ?
+    `).get(normalizedEmail) as JoinedUserRecord | undefined
+
+    if (!record) {
       return {
         error: 'Invalid email or password.',
         status: 401
       }
     }
 
-    if (user.password !== dto.password) {
+    // Constant-time hash comparison
+    const isPasswordValid = bcrypt.compareSync(dto.password, record.password_hash)
+    if (!isPasswordValid) {
       return {
         error: 'Invalid email or password.',
         status: 401
@@ -119,13 +192,16 @@ export class AuthService {
 
     const authResponse: AuthResponse = {
       user: {
-        id: user.id,
-        email: user.email,
-        name: user.name,
-        role: user.role,
-        studentId: user.studentId
+        id: record.user_id,
+        email: record.email,
+        name: record.full_name,
+        role: record.role,
+        studentId: record.student_id || undefined,
+        phone: record.phone || undefined,
+        preferences: record.preferences || undefined,
+        createdAt: record.created_at
       },
-      token: `mock-jwt-token-${user.id}-${Date.now()}`
+      token: `jwt-auth-${record.user_id}-${Date.now()}`
     }
 
     return {
@@ -135,25 +211,55 @@ export class AuthService {
   }
 
   /**
-   * Find user by ID
+   * Find user by ID (joined from UserCredentials and UserProfile)
    */
-  public getUserById(id: string): Omit<User, 'password'> | null {
-    const user = store.users.find((u) => u.id === id)
-    if (!user) return null
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...safeUser } = user
-    return safeUser
+  public getUserById(id: string): SafeUser | null {
+    const db = getDb()
+    const record = db.prepare(`
+      SELECT c.user_id, c.email, c.role, p.full_name, p.student_id, p.phone, p.preferences, c.created_at
+      FROM UserCredentials c
+      JOIN UserProfile p ON c.user_id = p.user_id
+      WHERE c.user_id = ?
+    `).get(id) as Omit<JoinedUserRecord, 'password_hash'> | undefined
+
+    if (!record) return null
+
+    return {
+      id: record.user_id,
+      email: record.email,
+      name: record.full_name,
+      role: record.role,
+      studentId: record.student_id || undefined,
+      phone: record.phone || undefined,
+      preferences: record.preferences || undefined,
+      createdAt: record.created_at
+    }
   }
 
   /**
-   * Find user by Email
+   * Find user by Email (joined from UserCredentials and UserProfile)
    */
-  public getUserByEmail(email: string): Omit<User, 'password'> | null {
-    const user = store.users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase())
-    if (!user) return null
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...safeUser } = user
-    return safeUser
+  public getUserByEmail(email: string): SafeUser | null {
+    const db = getDb()
+    const record = db.prepare(`
+      SELECT c.user_id, c.email, c.role, p.full_name, p.student_id, p.phone, p.preferences, c.created_at
+      FROM UserCredentials c
+      JOIN UserProfile p ON c.user_id = p.user_id
+      WHERE lower(c.email) = ?
+    `).get(email.trim().toLowerCase()) as Omit<JoinedUserRecord, 'password_hash'> | undefined
+
+    if (!record) return null
+
+    return {
+      id: record.user_id,
+      email: record.email,
+      name: record.full_name,
+      role: record.role,
+      studentId: record.student_id || undefined,
+      phone: record.phone || undefined,
+      preferences: record.preferences || undefined,
+      createdAt: record.created_at
+    }
   }
 }
 

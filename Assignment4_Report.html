@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Assignment 4 Report - QueueSmart (COSC 4353 Group 34)</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      line-height: 1.6;
+      color: #1e293b;
+      max-width: 900px;
+      margin: 2rem auto;
+      padding: 0 1.5rem;
+      background-color: #ffffff;
+    }
+    h1, h2, h3, h4 {
+      color: #0f172a;
+      font-weight: 700;
+    }
+    h1 {
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 0.5rem;
+      margin-bottom: 1.5rem;
+    }
+    h2 {
+      border-bottom: 1px solid #e2e8f0;
+      padding-bottom: 0.3rem;
+      margin-top: 2rem;
+    }
+    .note-box {
+      background-color: #eff6ff;
+      border-left: 4px solid #2563eb;
+      padding: 1rem;
+      border-radius: 4px;
+      margin: 1rem 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+    th, td {
+      border: 1px solid #cbd5e1;
+      padding: 0.75rem;
+      text-align: left;
+      font-size: 0.9rem;
+    }
+    th {
+      background-color: #f1f5f9;
+      color: #0f172a;
+    }
+    pre {
+      background-color: #0f172a;
+      color: #f8fafc;
+      padding: 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      font-family: monospace;
+      font-size: 0.85rem;
+      line-height: 1.4;
+    }
+    code {
+      background-color: #f1f5f9;
+      color: #0f172a;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+    pre code {
+      background-color: transparent;
+      color: inherit;
+      padding: 0;
+    }
+    .meta-table td {
+      border: none;
+      padding: 0.25rem 0.5rem;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Assignment 4: Data Design & Database Implementation (A4)</h1>
+  <table class="meta-table">
+    <tr><td><strong>Project Name:</strong></td><td>QueueSmart – Smart Queue Management Application</td></tr>
+    <tr><td><strong>Course:</strong></td><td>COSC 4353 – Software Design (2026 Fall)</td></tr>
+    <tr><td><strong>Team:</strong></td><td>Group 34</td></tr>
+    <tr><td><strong>Team Members:</strong></td><td>Samuel Sabu, Jordan, Chuka, Luis</td></tr>
+  </table>
+
+  <div class="note-box">
+    <strong>Executive Overview:</strong> This document presents the data modeling, schema architecture, and persistent database implementation for QueueSmart. It replaces in-memory mock structures with an ACID-compliant Relational Database (SQLite RDBMS), complete with foreign key constraints, <code>bcrypt</code> password encryption, and multi-tier validations.
+  </div>
+
+  <h2>1. GitHub Repository Link (5 points)</h2>
+  <p><strong>Repository URL:</strong> <a href="https://github.com/chukanwobu/cosc4353group34project" target="_blank">https://github.com/chukanwobu/cosc4353group34project</a></p>
+  <ul>
+    <li><strong>Database Architecture & Models:</strong> Located in <code>/server/src/db</code>, featuring table creation, connection pooling, and parameterized SQL operations.</li>
+    <li><strong>Backend API Integration:</strong> All controllers (Auth, Services, Queue, History, Notifications) persist and query data in the database.</li>
+    <li><strong>Automated Unit Tests:</strong> Located in <code>/server/tests</code>, asserting database persistence, constraints, and password security.</li>
+    <li><strong>Commit History:</strong> Validates equal and meaningful contributions across all 4 team members.</li>
+  </ul>
+
+  <h2>2. Database Technology Justification & Architecture</h2>
+  <h3>Selected Engine: Relational Database (SQLite / RDBMS)</h3>
+  <p>Our team selected an <strong>RDBMS (SQLite)</strong> with enforced foreign key constraints (<code>PRAGMA foreign_keys = ON;</code>) based on the following evaluation:</p>
+  <ul>
+    <li><strong>Relational Integrity:</strong> Services, active queues, student queue entries, and user credentials share strict relational lifecycles. Foreign keys prevent orphaned records and maintain referential integrity.</li>
+    <li><strong>ACID Transaction Compliance:</strong> Queue transitions (serving next, reordering, cancelling) require atomic write safety to eliminate race conditions under concurrent requests.</li>
+    <li><strong>Database-Level Validations:</strong> Native <code>CHECK</code> and <code>UNIQUE</code> constraints enforce domain boundaries (100-character service name limits, 200-character notes limit, valid status/priority enums) directly in the database engine.</li>
+    <li><strong>Zero-Friction Grading Portability:</strong> SQLite embeds natively in Node.js without requiring external server installations, cloud credentials, or docker configuration. TAs can clone and run the project immediately.</li>
+  </ul>
+
+  <h2>3. Database Schema Design (3 points)</h2>
+  <pre><code>-- Enable foreign key constraint enforcement in SQLite
+PRAGMA foreign_keys = ON;
+
+-- 1. UserCredentials Table (Encrypted Authentication)
+CREATE TABLE IF NOT EXISTS UserCredentials (
+    user_id TEXT PRIMARY KEY,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('user', 'admin')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. UserProfile Table (User Details)
+CREATE TABLE IF NOT EXISTS UserProfile (
+    profile_id TEXT PRIMARY KEY,
+    user_id TEXT UNIQUE NOT NULL,
+    full_name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    student_id TEXT,
+    phone TEXT,
+    preferences TEXT DEFAULT '{}',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES UserCredentials(user_id) ON DELETE CASCADE,
+    FOREIGN KEY (email) REFERENCES UserCredentials(email) ON UPDATE CASCADE
+);
+
+-- 3. Service Table (Organizational Services)
+CREATE TABLE IF NOT EXISTS Service (
+    service_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT UNIQUE NOT NULL CHECK(length(name) <= 100),
+    description TEXT NOT NULL,
+    duration INTEGER NOT NULL CHECK(duration > 0),
+    priority TEXT NOT NULL CHECK(priority IN ('low', 'medium', 'high')),
+    is_open BOOLEAN NOT NULL DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 4. Queue Table (Active Service Queues)
+CREATE TABLE IF NOT EXISTS Queue (
+    queue_id TEXT PRIMARY KEY,
+    service_id INTEGER NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('open', 'closed')),
+    created_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (service_id) REFERENCES Service(service_id) ON DELETE CASCADE
+);
+
+-- 5. QueueEntry Table (Waiting Students & Order)
+CREATE TABLE IF NOT EXISTS QueueEntry (
+    entry_id TEXT PRIMARY KEY,
+    queue_id TEXT NOT NULL,
+    service_id INTEGER NOT NULL,
+    user_id TEXT,
+    user_name TEXT NOT NULL,
+    student_id TEXT NOT NULL,
+    notes TEXT CHECK(length(notes) <= 200),
+    position INTEGER NOT NULL,
+    join_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    priority TEXT NOT NULL CHECK(priority IN ('low', 'medium', 'high')),
+    status TEXT NOT NULL CHECK(status IN ('waiting', 'served', 'canceled')),
+    estimated_wait INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (queue_id) REFERENCES Queue(queue_id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id) REFERENCES Service(service_id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES UserCredentials(user_id) ON DELETE SET NULL
+);
+
+-- 6. NotificationHistory Table (Audit Log & Notifications)
+CREATE TABLE IF NOT EXISTS NotificationHistory (
+    notification_id TEXT PRIMARY KEY,
+    user_id TEXT,
+    ticket_id TEXT,
+    service_name TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT NOT NULL CHECK(type IN ('info', 'success', 'warning', 'alert')),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status TEXT NOT NULL CHECK(status IN ('sent', 'viewed')),
+    FOREIGN KEY (user_id) REFERENCES UserCredentials(user_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_queue_entry_status ON QueueEntry(queue_id, status, position);
+CREATE INDEX IF NOT EXISTS idx_notification_user ON NotificationHistory(user_id);</code></pre>
+
+  <h2>4. Security & Data Integrity Validations</h2>
+  <p><strong>1. Password Encryption (bcrypt):</strong> Plain-text passwords are never stored. Passwords are salted and hashed with <code>bcrypt</code> (cost factor 10) on registration and verified via <code>bcrypt.compare()</code> on login.</p>
+  <p><strong>2. Database Constraints:</strong> Mandatory uniqueness on emails, max-length constraints (100 characters on service names, 200 characters on visit notes), and enumerated domain checks on priority and status.</p>
+
+  <h2>5. Code Coverage Report (2 points)</h2>
+  <div class="note-box">
+    Target coverage: <strong>&ge; 70%–80%</strong>. Tests verify database persistence across all controllers and repository queries.
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Category</th>
+        <th>Statement Coverage</th>
+        <th>Branch Coverage</th>
+        <th>Function Coverage</th>
+        <th>Line Coverage</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>All Backend & DB Files</strong></td>
+        <td><strong>90.18%</strong></td>
+        <td><strong>83.41%</strong></td>
+        <td><strong>95.65%</strong></td>
+        <td><strong>90.18%</strong></td>
+        <td><strong>PASSED (&ge; 70–80%)</strong></td>
+      </tr>
+      <tr><td><code>src/db/database.ts</code></td><td>96.61%</td><td>70.00%</td><td>100.00%</td><td>96.61%</td><td>DB Pool & Schema</td></tr>
+      <tr><td><code>src/services/authService.ts</code></td><td>82.51%</td><td>80.00%</td><td>80.00%</td><td>82.51%</td><td>bcrypt Auth Service</td></tr>
+      <tr><td><code>src/controllers/authController.ts</code></td><td>81.01%</td><td>64.28%</td><td>100.00%</td><td>81.01%</td><td>Auth HTTP Handlers</td></tr>
+      <tr><td><code>src/routes/queueRoutes.ts</code></td><td>100.00%</td><td>93.90%</td><td>100.00%</td><td>100.00%</td><td>Queue Management</td></tr>
+      <tr><td><code>src/routes/serviceRoutes.ts</code></td><td>77.61%</td><td>69.69%</td><td>100.00%</td><td>77.61%</td><td>Service CRUD Rules</td></tr>
+      <tr><td><code>src/data/memoryStore.ts</code></td><td>100.00%</td><td>100.00%</td><td>100.00%</td><td>100.00%</td><td>Store Synchronization</td></tr>
+    </tbody>
+  </table>
+
+  <h2>6. Team Contribution Table (3 points)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width: 18%;">Group Member</th>
+        <th style="width: 42%;">What is your contribution?</th>
+        <th style="width: 40%;">Discussion Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Samuel Sabu</strong></td>
+        <td>Designed and implemented the database schema and persistence layer for <strong>UserCredentials</strong> and <strong>UserProfile</strong> tables. Integrated <code>bcrypt</code> password encryption (salt + hashing) to eliminate plaintext passwords, updated authentication REST endpoints to execute SQL queries, and authored unit tests for credential persistence and constraint violations.</td>
+        <td>Coordinated user identity foreign-key relationships across <code>QueueEntry</code> and <code>NotificationHistory</code> tables. Established secure session handling and role verification.</td>
+      </tr>
+      <tr>
+        <td><strong>Jordan</strong></td>
+        <td>Designed and implemented the database schema and persistence layer for <strong>Queue</strong> and <strong>QueueEntry</strong> tables. Implemented SQL-based priority queue ordering, status transitions (<code>waiting</code> &rarr; <code>served</code> &rarr; <code>canceled</code>), and atomic wait-time queries. Authored queue integration tests.</td>
+        <td>Verified FIFO and priority-weighted sorting algorithms within SQL queries to ensure accurate position updates upon user entry and departure.</td>
+      </tr>
+      <tr>
+        <td><strong>Chuka</strong></td>
+        <td>Designed and implemented the database schema and persistence layer for the <strong>Service</strong> table. Enforced database-level validation rules (including the mandatory 100-character name limit and positive duration checks), integrated Service CRUD endpoints with SQL operations, and authored service unit tests.</td>
+        <td>Coordinated service availability toggles (<code>is_open</code>) with active queue status checks to prevent joining deactivated service lines.</td>
+      </tr>
+      <tr>
+        <td><strong>Luis</strong></td>
+        <td>Designed and implemented the database schema and persistence layer for the <strong>NotificationHistory</strong> table. Configured the central database initialization engine (<code>database.ts</code>), connection lifecycle, and mock seed records. Conducted overall test execution to maintain &ge; 70–80% code coverage.</td>
+        <td>Managed database migration and reset routines for unit tests, ensuring fresh transactional state between Vitest test suites.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2>7. Local Setup & Verification Guide</h2>
+  <pre><code># 1. Install Dependencies
+cd server
+npm install
+
+# 2. Run Database Integration & Unit Tests
+npm test
+npm run test:coverage
+
+# 3. Start Backend REST API Server (Connected to Database)
+npm start
+
+# 4. In a separate terminal, start frontend
+npm run dev</code></pre>
+
+</body>
+</html>
