@@ -6,38 +6,58 @@ export interface DatabaseContext {
   db: Database.Database
 }
 
-// In test environment, use ':memory:' for isolated, non-locking sub-millisecond execution.
-// In development/production, use persistent 'queuesmart.db' file.
+// In test environment, use ':memory:' for isolated, non-locking execution.
+// In development/production, use a persistent file (override with DB_PATH).
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.VITEST === 'true'
-const DB_PATH = isTestEnv ? ':memory:' : path.resolve(__dirname, '../../queuesmart.db')
+const DB_PATH = isTestEnv
+  ? ':memory:'
+  : process.env.DB_PATH ?? path.resolve(__dirname, '../../queuesmart.db')
+
+// bcrypt cost: low in tests so seeding stays fast, standard otherwise.
+const BCRYPT_ROUNDS = isTestEnv ? 4 : 10
 
 let dbInstance: Database.Database | null = null
 
 export function getDb(): Database.Database {
-  if (!dbInstance) {
-    dbInstance = new Database(DB_PATH)
+  if (dbInstance) return dbInstance
+
+  // Build on a local variable and only publish the singleton once setup fully
+  // succeeds, so a failed init can't leave a half-configured DB behind.
+  const db = new Database(DB_PATH)
+
+  try {
     // Configure SQLite pragmas for relational integrity and performance
-    dbInstance.pragma('foreign_keys = ON')
+    db.pragma('foreign_keys = ON')
     if (!isTestEnv) {
-      dbInstance.pragma('journal_mode = WAL')
+      db.pragma('journal_mode = WAL')
     }
-    dbInstance.pragma('busy_timeout = 5000')
+    db.pragma('busy_timeout = 5000')
 
-    
-  const isNewDatabase =
-    isTestEnv ||
-    !dbInstance.prepare(
-      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'Service'"
-    ).get()
+    const isNewDatabase =
+      isTestEnv ||
+      !db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'Service'")
+        .get()
 
-  initializeSchema(dbInstance)
+    initializeSchema(db)
 
-  if (isNewDatabase) {
-    seedDatabase(dbInstance)
+    if (isNewDatabase) {
+      seedDatabase(db)
+    }
+  } catch (err) {
+    db.close()
+    throw err
   }
 
+  dbInstance = db
+  return db
+}
+
+export function closeDb(): void {
+  if (dbInstance) {
+    dbInstance.close()
+    dbInstance = null
   }
-  return dbInstance
 }
 
 export function initializeSchema(db: Database.Database): void {
@@ -136,46 +156,86 @@ export function initializeSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_queue_entry_status ON QueueEntry(queue_id, status, position);
     CREATE INDEX IF NOT EXISTS idx_notification_user ON NotificationHistory(user_id);
     CREATE INDEX IF NOT EXISTS idx_user_credentials_email ON UserCredentials(email);
+
+    -- Integrity Indexes
+    -- A signed-in user can only have one active (waiting) entry per queue.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_entry_per_user
+      ON QueueEntry(queue_id, user_id)
+      WHERE status = 'waiting' AND user_id IS NOT NULL;
+
+    -- Optional: enforce unique positions among waiting entries. Enable only if
+    -- you reorder positions inside a transaction (shifting can briefly collide).
+    -- CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_waiting_position
+    --   ON QueueEntry(queue_id, position) WHERE status = 'waiting';
   `)
 }
 
 export function seedDatabase(db: Database.Database): void {
   initializeSchema(db)
 
-  const studentPasswordHash = bcrypt.hashSync('password123', 10)
-  const adminPasswordHash = bcrypt.hashSync('admin1234', 10)
+  const studentPasswordHash = bcrypt.hashSync('password123', BCRYPT_ROUNDS)
+  const adminPasswordHash = bcrypt.hashSync('admin1234', BCRYPT_ROUNDS)
 
-  const insertCred = db.prepare(`
-    INSERT OR REPLACE INTO UserCredentials (user_id, email, password_hash, role)
+  // Upserts (not INSERT OR REPLACE): REPLACE deletes then re-inserts the row,
+  // which fires ON DELETE CASCADE / SET NULL on child tables.
+  const upsertCred = db.prepare(`
+    INSERT INTO UserCredentials (user_id, email, password_hash, role)
     VALUES (?, ?, ?, ?)
+    ON CONFLICT(user_id) DO UPDATE SET
+      email = excluded.email,
+      password_hash = excluded.password_hash,
+      role = excluded.role,
+      updated_at = CURRENT_TIMESTAMP
   `)
 
-  const insertProfile = db.prepare(`
-    INSERT OR REPLACE INTO UserProfile (profile_id, user_id, full_name, email, student_id, phone, preferences)
+  const upsertProfile = db.prepare(`
+    INSERT INTO UserProfile (profile_id, user_id, full_name, email, student_id, phone, preferences)
     VALUES (?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(profile_id) DO UPDATE SET
+      user_id = excluded.user_id,
+      full_name = excluded.full_name,
+      email = excluded.email,
+      student_id = excluded.student_id,
+      phone = excluded.phone,
+      preferences = excluded.preferences
   `)
 
-  
   const insertService = db.prepare(`
-    INSERT OR IGNORE INTO Service
-      (service_id, name, description, duration, priority, is_open)
+    INSERT INTO Service (service_id, name, description, duration, priority, is_open)
     VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(service_id) DO NOTHING
   `)
-
 
   const insertQueue = db.prepare(`
-    INSERT OR REPLACE INTO Queue (queue_id, service_id, status)
+    INSERT INTO Queue (queue_id, service_id, status)
     VALUES (?, ?, ?)
+    ON CONFLICT(queue_id) DO NOTHING
   `)
 
   const seedTransaction = db.transaction(() => {
     // Seed Demo Student (Samuel Sabu)
-    insertCred.run('usr-1', 'user@queuesmart.com', studentPasswordHash, 'user')
-    insertProfile.run('prof-1', 'usr-1', 'Samuel Sabu', 'user@queuesmart.com', '1984203', '713-555-0199', '{"notifications":true}')
+    upsertCred.run('usr-1', 'user@queuesmart.com', studentPasswordHash, 'user')
+    upsertProfile.run(
+      'prof-1',
+      'usr-1',
+      'Samuel Sabu',
+      'user@queuesmart.com',
+      '1984203',
+      '713-555-0199',
+      '{"notifications":true}'
+    )
 
     // Seed Demo Admin
-    insertCred.run('usr-2', 'admin@queuesmart.com', adminPasswordHash, 'admin')
-    insertProfile.run('prof-2', 'usr-2', 'Campus Administrator', 'admin@queuesmart.com', 'ADMIN-01', '713-555-0100', '{"notifications":true,"adminAlerts":true}')
+    upsertCred.run('usr-2', 'admin@queuesmart.com', adminPasswordHash, 'admin')
+    upsertProfile.run(
+      'prof-2',
+      'usr-2',
+      'Campus Administrator',
+      'admin@queuesmart.com',
+      'ADMIN-01',
+      '713-555-0100',
+      '{"notifications":true,"adminAlerts":true}'
+    )
 
     // Seed Services & Active Queues
     insertService.run(1, 'Academic Advising', 'Degree planning, course registration overrides, and graduation checks.', 15, 'high', 1)
@@ -195,6 +255,10 @@ export function seedDatabase(db: Database.Database): void {
 }
 
 export function resetDatabase(): void {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('resetDatabase() is disabled in production')
+  }
+
   const db = getDb()
   initializeSchema(db)
 
