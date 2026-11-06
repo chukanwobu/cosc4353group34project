@@ -23,8 +23,19 @@ export function getDb(): Database.Database {
     }
     dbInstance.pragma('busy_timeout = 5000')
 
-    initializeSchema(dbInstance)
+    
+  const isNewDatabase =
+    isTestEnv ||
+    !dbInstance.prepare(
+      "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'Service'"
+    ).get()
+
+  initializeSchema(dbInstance)
+
+  if (isNewDatabase) {
     seedDatabase(dbInstance)
+  }
+
   }
   return dbInstance
 }
@@ -144,10 +155,13 @@ export function seedDatabase(db: Database.Database): void {
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `)
 
+  
   const insertService = db.prepare(`
-    INSERT OR REPLACE INTO Service (service_id, name, description, duration, priority, is_open)
+    INSERT OR IGNORE INTO Service
+      (service_id, name, description, duration, priority, is_open)
     VALUES (?, ?, ?, ?, ?, ?)
   `)
+
 
   const insertQueue = db.prepare(`
     INSERT OR REPLACE INTO Queue (queue_id, service_id, status)
