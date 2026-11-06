@@ -21,8 +21,8 @@ export interface JoinQueueDTO {
   serviceId: number
   userName: string
   studentId: string
-    notes: string
-  Priority?: PriorityLevel
+  notes: string
+  priority?: PriorityLevel
 }
 
 export interface NotificationItem {

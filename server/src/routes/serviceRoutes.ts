@@ -1,14 +1,22 @@
+import { getDb } from '../db/database'
 import { Router, Request, Response } from 'express'
-import { store } from '../data/memoryStore'
-import { CreateServiceDTO, Priority, Service } from '../types/service'
+
+import {
+  getAllServices,
+  getServiceById,
+  createService,
+  updateService,
+  deleteService
+} from '../db/serviceRepository'
+import { CreateServiceDTO } from '../types/service'
 
 const router = Router()
 
-// GET /api/services - List all services
+// GET /api/services - Retrieve services from SQLite
 router.get('/', (_req: Request, res: Response) => {
   res.status(200).json({
     success: true,
-    data: store.services
+    data: getAllServices()
   })
 })
 
@@ -51,50 +59,96 @@ router.post('/', (req: Request, res: Response) => {
     return
   }
 
-  const newService: Service = {
-    id: Date.now(),
+  try {
+  const newService = createService({
     name: name.trim(),
     description: description.trim(),
     duration: numDuration,
-    priority: priority as Priority,
-    isOpen: true,
-    createdAt: new Date().toISOString()
-  }
+    priority
+  })
 
-  store.services.push(newService)
   res.status(201).json({
     success: true,
     message: 'Service successfully created.',
     data: newService
   })
-})
-
-// PATCH /api/services/:id/toggle - Open/Close service queue
-router.patch('/:id/toggle', (req: Request, res: Response) => {
-  const serviceId = Number(req.params.id)
-  const service = store.services.find((s) => s.id === serviceId)
-
-  if (!service) {
-    res.status(404).json({ success: false, error: 'Service not found.' })
+} catch (error) {
+  if (
+    error instanceof Error &&
+    error.message.includes('UNIQUE constraint failed')
+  ) {
+    res.status(409).json({
+      success: false,
+      error: 'A service with this name already exists.'
+    })
     return
   }
 
-  service.isOpen = !service.isOpen
-  res.status(200).json({
-    success: true,
-    message: `Service "${service.name}" queue is now ${service.isOpen ? 'OPEN' : 'CLOSED'}.`,
-    data: service
+  console.error('Failed to create service:', error)
+  res.status(500).json({
+    success: false,
+    error: 'Failed to create service.'
   })
+}
 })
+
+// PATCH /api/services/:id/toggle - Open/Close service queue
+
+router.patch('/:id/toggle', (req: Request, res: Response) => {
+  const serviceId = Number(req.params.id)
+  const service = getServiceById(serviceId)
+
+  if (!service) {
+    res.status(404).json({
+      success: false,
+      error: 'Service not found.'
+    })
+    return
+  }
+
+  try {
+    const db = getDb()
+    const newStatus = service.isOpen ? 0 : 1
+
+    const toggleTransaction = db.transaction(() => {
+      db.prepare(`
+        UPDATE Service
+        SET is_open = ?
+        WHERE service_id = ?
+      `).run(newStatus, serviceId)
+
+      db.prepare(`
+        UPDATE Queue
+        SET status = ?
+        WHERE service_id = ?
+      `).run(newStatus ? 'open' : 'closed', serviceId)
+    })
+
+    toggleTransaction()
+
+    const updatedService = getServiceById(serviceId)
+
+    res.status(200).json({
+      success: true,
+      message: `Service "${service.name}" queue is now ${newStatus ? 'OPEN' : 'CLOSED'}.`,
+      data: updatedService
+    })
+  } catch (error) {
+    console.error('Failed to toggle service:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to toggle service.'
+    })
+  }
+})
+
 
 
 // PUT /api/services/:id - Update an existing service
 router.put('/:id', (req: Request, res: Response) => {
   const serviceId = Number(req.params.id)
 
-  const service = store.services.find(
-    (s) => s.id === serviceId
-  )
+  const service = getServiceById(serviceId)
 
   if (!service) {
     res.status(404).json({
@@ -139,34 +193,70 @@ router.put('/:id', (req: Request, res: Response) => {
     return
   }
 
-  service.name = name.trim()
-  service.description = description.trim()
-  service.duration = duration
-  service.priority = priority
+  
+try {
+  const updatedService = updateService(serviceId, {
+    name: name.trim(),
+    description: description.trim(),
+    duration,
+    priority
+  })
 
   res.status(200).json({
     success: true,
     message: 'Service successfully updated.',
-    data: service
+    data: updatedService
   })
+} catch (error) {
+  if (
+    error instanceof Error &&
+    error.message.includes('UNIQUE constraint failed')
+  ) {
+    res.status(409).json({
+      success: false,
+      error: 'A service with this name already exists.'
+    })
+    return
+  }
+
+  console.error('Failed to update service:', error)
+  res.status(500).json({
+    success: false,
+    error: 'Failed to update service.'
+  })
+}
 })
+
 
 
 // DELETE /api/services/:id
 router.delete('/:id', (req: Request, res: Response) => {
   const serviceId = Number(req.params.id)
-  const index = store.services.findIndex((s) => s.id === serviceId)
+  const service = getServiceById(serviceId)
 
-  if (index === -1) {
-    res.status(404).json({ success: false, error: 'Service not found.' })
+  if (!service) {
+    res.status(404).json({
+      success: false,
+      error: 'Service not found.'
+    })
     return
   }
 
-  const removed = store.services.splice(index, 1)[0]
-  res.status(200).json({
-    success: true,
-    message: `Service "${removed.name}" deleted successfully.`
-  })
+  try {
+    deleteService(serviceId)
+
+    res.status(200).json({
+      success: true,
+      message: `Service "${service.name}" deleted successfully.`
+    })
+  } catch (error) {
+    console.error('Failed to delete service:', error)
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete service.'
+    })
+  }
 })
+
 
 export default router
