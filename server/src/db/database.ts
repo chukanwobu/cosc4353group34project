@@ -1,7 +1,6 @@
 import Database from 'better-sqlite3'
 import bcrypt from 'bcryptjs'
 import path from 'path'
-
 export interface DatabaseContext {
   db: Database.Database
 }
