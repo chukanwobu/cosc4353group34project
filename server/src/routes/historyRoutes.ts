@@ -1,13 +1,15 @@
 import { Router, Request, Response } from 'express'
-import { store } from '../data/memoryStore'
+import { listHistory } from '../db/queueRepository'
 
 const router = Router()
 
-// GET /api/history - Return user queue participation history
-router.get('/', (_req: Request, res: Response) => {
+// GET /api/history - Return queue participation history (finished tickets, most recently joined first).
+// Optional ?userId= limits it to one account.
+router.get('/', (req: Request, res: Response) => {
+  const userId = typeof req.query.userId === 'string' && req.query.userId ? req.query.userId : undefined
   res.status(200).json({
     success: true,
-    data: store.history
+    data: listHistory(userId)
   })
 })
 

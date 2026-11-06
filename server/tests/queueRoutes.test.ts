@@ -2,11 +2,14 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import express from 'express'
 import request from 'supertest'
 import { store } from '../src/data/memoryStore'
+import { getDb } from '../src/db/database'
 import queueRoutes from '../src/routes/queueRoutes'
+import historyRoutes from '../src/routes/historyRoutes'
 
 const app = express()
 app.use(express.json())
 app.use('/api/queue', queueRoutes)
+app.use('/api/history', historyRoutes)
 
 // Seed data (memoryStore.ts): service 1 has TICK-101 in_progress + TICK-102 waiting.
 // Service 2 (duration 20, medium) and service 3 (duration 10, medium) are empty. Service 4 is closed.
@@ -14,7 +17,12 @@ const base = { serviceId: 2, userName: 'Test User', studentId: 'S100', notes: 'N
 const join = (body: object) => request(app).post('/api/queue/join').send(body)
 const queueOf = async (serviceId: number) => (await request(app).get(`/api/queue/${serviceId}`)).body.data
 
-beforeEach(() => store.reset())
+beforeEach(() => {
+  store.reset() // also resets the SQLite database
+})
+
+const historyOf = async () => (await request(app).get('/api/history')).body.data
+const ticketOf = async (id: string) => (await request(app).get(`/api/queue/status/${id}`)).body.data
 
 describe('GET queue lists', () => {
   it('GET / returns every active ticket', async () => {
@@ -119,8 +127,8 @@ describe('POST /leave', () => {
   it('cancels the ticket, archives it, and moves the line up', async () => {
     const res = await request(app).post('/api/queue/leave').send({ ticketId: 'TICK-101' })
     expect(res.status).toBe(200)
-    expect(store.history[0]).toMatchObject({ id: 'TICK-101', status: 'cancelled' })
-    const t102 = store.tickets.find((t) => t.id === 'TICK-102')!
+    expect((await historyOf())[0]).toMatchObject({ id: 'TICK-101', status: 'cancelled' })
+    const t102 = await ticketOf('TICK-102')
     expect(t102.position).toBe(1)
     expect(t102.estimatedWait).toBe(0)
   })
@@ -129,7 +137,7 @@ describe('POST /leave', () => {
     const b = await join({ ...base, studentId: 'B' })
     const c = await join({ ...base, studentId: 'C' })
     await request(app).post('/api/queue/leave').send({ ticketId: b.body.data.id })
-    const ticketC = store.tickets.find((t) => t.id === c.body.data.id)!
+    const ticketC = await ticketOf(c.body.data.id)
     expect(ticketC.position).toBe(2)
     expect(ticketC.estimatedWait).toBe(20)
   })
@@ -142,7 +150,7 @@ describe('POST /serve-next', () => {
     const res = await serve(1)
     expect(res.status).toBe(200)
     expect(res.body.data).toMatchObject({ id: 'TICK-102', status: 'in_progress', position: 1, estimatedWait: 0 })
-    expect(store.history[0]).toMatchObject({ id: 'TICK-101', status: 'completed' })
+    expect((await historyOf())[0]).toMatchObject({ id: 'TICK-101', status: 'completed' })
   })
   it('keeps positions unique when nobody is in progress yet', async () => {
     await join({ ...base, studentId: 'A' })
@@ -168,5 +176,52 @@ describe('POST /serve-next', () => {
   it('returns 400 for an empty queue or a missing service ID', async () => {
     expect((await serve(2)).status).toBe(400)
     expect((await serve()).status).toBe(400)
+  })
+})
+
+describe('user-linked tickets and history filter', () => {
+  it('rejects prototype keys as a priority instead of failing in the database', async () => {
+    const res = await join({ ...base, priority: 'constructor' })
+    expect(res.status).toBe(400)
+    expect(res.body.details.priority).toBeDefined()
+  })
+  it('returns 400 for a userId that does not exist', async () => {
+    const res = await join({ ...base, userId: 'ghost' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/user/i)
+  })
+  it('links a ticket to a user and filters /api/history by that user', async () => {
+    getDb().prepare(`INSERT INTO UserCredentials (user_id, email, password_hash, role) VALUES ('u-7', 'a@b.com', 'h', 'user')`).run()
+    const mine = await join({ ...base, userId: 'u-7' })
+    await request(app).post('/api/queue/leave').send({ ticketId: mine.body.data.id })
+    const filtered = (await request(app).get('/api/history?userId=u-7')).body.data
+    expect(filtered.map((t: any) => t.id)).toEqual([mine.body.data.id])
+    expect(await historyOf()).toHaveLength(2) // TICK-098 from the seed + the cancelled one
+  })
+})
+
+describe('services still managed in the in-memory store', () => {
+  it('lets people join a service an admin just created', async () => {
+    store.services.push({ id: 555, name: 'Tutoring', description: 'Peer tutoring', duration: 25, priority: 'low', isOpen: true, createdAt: new Date().toISOString() })
+    const a = await join({ ...base, serviceId: 555 })
+    const b = await join({ ...base, serviceId: 555, studentId: 'S2' })
+    expect(a.status).toBe(201)
+    expect(b.body.data).toMatchObject({ position: 2, estimatedWait: 25, serviceName: 'Tutoring' })
+  })
+  it('uses the current open/closed state and duration from the store', async () => {
+    store.services.find((s) => s.id === 2)!.isOpen = false
+    expect((await join(base)).status).toBe(400)
+    const svc = store.services.find((s) => s.id === 3)!
+    svc.duration = 7
+    await join({ ...base, serviceId: 3 })
+    expect((await join({ ...base, serviceId: 3, studentId: 'S2' })).body.data.estimatedWait).toBe(7)
+  })
+  it('returns 404 for a service that was deleted from the store', async () => {
+    store.services = store.services.filter((s) => s.id !== 2)
+    expect((await join(base)).status).toBe(404)
+  })
+  it('returns a clean 404 (not a crash) when another service already owns that name in the database', async () => {
+    store.services.push({ id: 777, name: 'Academic Advising', description: 'dup', duration: 5, priority: 'low', isOpen: true, createdAt: '' })
+    expect((await join({ ...base, serviceId: 777 })).status).toBe(404)
   })
 })

@@ -2,6 +2,8 @@ import Database from 'better-sqlite3'
 import bcrypt from 'bcryptjs'
 import path from 'path'
 
+export type Db = Database.Database
+
 export interface DatabaseContext {
   db: Database.Database
 }
@@ -29,7 +31,54 @@ export function getDb(): Database.Database {
   return dbInstance
 }
 
+/**
+ * QueueEntry lifecycle: waiting -> in_progress (being served) -> served | canceled.
+ * 'in_progress' is needed so the ticket currently at the counter can be represented.
+ */
+const QUEUE_ENTRY_DDL = `
+CREATE TABLE IF NOT EXISTS QueueEntry (
+  entry_id TEXT PRIMARY KEY,
+  queue_id TEXT NOT NULL,
+  service_id INTEGER NOT NULL,
+  user_id TEXT,
+  user_name TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  notes TEXT CHECK(length(notes) <= 200),
+  position INTEGER NOT NULL,
+  join_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  priority TEXT NOT NULL CHECK(priority IN ('low', 'medium', 'high')),
+  status TEXT NOT NULL CHECK(status IN ('waiting', 'in_progress', 'served', 'canceled')),
+  estimated_wait INTEGER NOT NULL DEFAULT 0,
+  FOREIGN KEY (queue_id) REFERENCES Queue(queue_id) ON DELETE CASCADE,
+  FOREIGN KEY (service_id) REFERENCES Service(service_id) ON DELETE CASCADE,
+  FOREIGN KEY (user_id) REFERENCES UserCredentials(user_id) ON DELETE SET NULL
+);
+`
+
+/**
+ * Databases created before 'in_progress' existed (an old queuesmart.db on a teammate's machine) have a CHECK
+ * that rejects it. Rebuild just the QueueEntry table in place, keeping its rows and their order.
+ */
+function migrateQueueEntryStatus(db: Database.Database): void {
+  const row = db.prepare(`SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'QueueEntry'`).get() as
+    | { sql: string }
+    | undefined
+  if (!row || row.sql.includes("'in_progress'")) return
+
+  db.pragma('foreign_keys = OFF')
+  try {
+    db.transaction(() => {
+      db.exec(`DROP INDEX IF EXISTS idx_queue_entry_status; ALTER TABLE QueueEntry RENAME TO QueueEntry_old;`)
+      db.exec(QUEUE_ENTRY_DDL)
+      db.exec(`INSERT INTO QueueEntry SELECT * FROM QueueEntry_old ORDER BY rowid; DROP TABLE QueueEntry_old;`)
+    })()
+  } finally {
+    db.pragma('foreign_keys = ON')
+  }
+}
+
 export function initializeSchema(db: Database.Database): void {
+  migrateQueueEntryStatus(db)
   db.exec(`
     PRAGMA foreign_keys = ON;
 
@@ -88,23 +137,7 @@ export function initializeSchema(db: Database.Database): void {
     -- ============================================================================
     -- 5. QueueEntry Table (Waiting Students & Queue Order)
     -- ============================================================================
-    CREATE TABLE IF NOT EXISTS QueueEntry (
-      entry_id TEXT PRIMARY KEY,
-      queue_id TEXT NOT NULL,
-      service_id INTEGER NOT NULL,
-      user_id TEXT,
-      user_name TEXT NOT NULL,
-      student_id TEXT NOT NULL,
-      notes TEXT CHECK(length(notes) <= 200),
-      position INTEGER NOT NULL,
-      join_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      priority TEXT NOT NULL CHECK(priority IN ('low', 'medium', 'high')),
-      status TEXT NOT NULL CHECK(status IN ('waiting', 'served', 'canceled')),
-      estimated_wait INTEGER NOT NULL DEFAULT 0,
-      FOREIGN KEY (queue_id) REFERENCES Queue(queue_id) ON DELETE CASCADE,
-      FOREIGN KEY (service_id) REFERENCES Service(service_id) ON DELETE CASCADE,
-      FOREIGN KEY (user_id) REFERENCES UserCredentials(user_id) ON DELETE SET NULL
-    );
+    ${QUEUE_ENTRY_DDL}
 
     -- ============================================================================
     -- 6. NotificationHistory Table (Audit Logs & Notifications)
@@ -154,6 +187,13 @@ export function seedDatabase(db: Database.Database): void {
     VALUES (?, ?, ?)
   `)
 
+  const insertEntry = db.prepare(`
+    INSERT OR REPLACE INTO QueueEntry
+      (entry_id, queue_id, service_id, user_id, user_name, student_id, notes, position, join_time, priority, status, estimated_wait)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `)
+  const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString().slice(0, 19).replace('T', ' ')
+
   const seedTransaction = db.transaction(() => {
     // Seed Demo Student (Samuel Sabu)
     insertCred.run('usr-1', 'user@queuesmart.com', studentPasswordHash, 'user')
@@ -175,6 +215,11 @@ export function seedDatabase(db: Database.Database): void {
 
     insertService.run(4, 'Campus IT Help Desk', 'Password resets, software licensing, campus Wi-Fi, and hardware support.', 12, 'low', 0)
     insertQueue.run('q-4', 4, 'closed')
+
+    // Demo tickets (same as the A3 in-memory seed): 101 is being served, 102 is waiting behind it, 098 is history.
+    insertEntry.run('TICK-098', 'q-3', 3, 'usr-1', 'Samuel Sabu', '1984203', 'Official transcript copy pickup.', 0, ago(24 * 60), 'medium', 'served', 0)
+    insertEntry.run('TICK-101', 'q-1', 1, 'usr-1', 'Samuel Sabu', '1984203', 'Need degree plan approval for COSC 4353.', 1, ago(25), 'high', 'in_progress', 0)
+    insertEntry.run('TICK-102', 'q-1', 1, null, 'Jordan Lee', '1849201', 'Questions about elective prerequisites.', 2, ago(10), 'high', 'waiting', 15)
   })
 
   seedTransaction()

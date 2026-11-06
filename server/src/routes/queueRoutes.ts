@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express'
 import { store } from '../data/memoryStore'
-import { JoinQueueDTO, Ticket } from '../types/queue'
+import { JoinQueueDTO } from '../types/queue'
+import * as queueRepo from '../db/queueRepository'
+import { QueueError } from '../db/queueRepository'
 
 const router = Router()
 
@@ -13,40 +15,18 @@ const MAX_NOTES_LENGTH = 200
 
 const nowTime = () => new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 
-/** Unique, sequential ticket IDs (TICK-103, TICK-104, ...) instead of random 3-digit numbers that can collide. */
-function nextTicketId(): string {
-  const used = [...store.tickets, ...store.history]
-    .map((t) => Number(/^TICK-(\d+)$/.exec(t.id)?.[1]))
-    .filter((n) => !Number.isNaN(n))
-  return `TICK-${Math.max(100, ...used) + 1}`
-}
-
-/**
- * Single source of truth for queue order and wait times.
- *  - the ticket being served stays at position 1
- *  - waiting tickets are ordered by priority (high > medium > low)
- *  - equal priority keeps arrival order (FIFO): Array.sort is stable and store.tickets is in arrival order
- *  - wait time = (position - 1) x service duration
- */
-function recalculateQueue(serviceId: number): void {
-  const service = store.services.find((s) => s.id === serviceId)
-  const duration = service ? service.duration : 15
-  const rank = (t: Ticket) => PRIORITY_RANK[t.priority ?? service?.priority ?? 'low'] ?? 1
-
-  const inProgress = store.tickets.filter((t) => t.serviceId === serviceId && t.status === 'in_progress')
-  const waiting = store.tickets
-    .filter((t) => t.serviceId === serviceId && t.status === 'waiting')
-    .sort((a, b) => rank(b) - rank(a))
-
-  let position = 1
-  inProgress.forEach((t) => {
-    t.position = position++
-    t.estimatedWait = 0
-  })
-  waiting.forEach((t) => {
-    t.position = position++
-    t.estimatedWait = Math.max(0, (t.position - 1) * duration)
-  })
+/** Maps repository errors to HTTP responses; returns true when handled. */
+function sendQueueError(res: Response, err: unknown): boolean {
+  if (!(err instanceof QueueError)) return false
+  const status: Record<QueueError['code'], number> = {
+    SERVICE_NOT_FOUND: 404,
+    TICKET_NOT_FOUND: 404,
+    UNKNOWN_USER: 400,
+    SERVICE_CLOSED: 400,
+    EMPTY_QUEUE: 400
+  }
+  res.status(status[err.code]).json({ success: false, error: err.message })
+  return true
 }
 
 // ---------- Routes ----------
@@ -55,13 +35,13 @@ function recalculateQueue(serviceId: number): void {
 router.get('/', (_req: Request, res: Response) => {
   res.status(200).json({
     success: true,
-    data: store.tickets
+    data: queueRepo.listActiveTickets()
   })
 })
 
 // GET /api/queue/status/:ticketId - Look up one ticket (added: used by the Queue Status screen)
 router.get('/status/:ticketId', (req: Request, res: Response) => {
-  const ticket = store.tickets.find((t) => t.id === req.params.ticketId)
+  const ticket = queueRepo.getTicket(req.params.ticketId)
   if (!ticket) {
     res.status(404).json({ success: false, error: 'Ticket not found.' })
     return
@@ -72,9 +52,7 @@ router.get('/status/:ticketId', (req: Request, res: Response) => {
 // GET /api/queue/:serviceId - Get queue for specific service
 router.get('/:serviceId', (req: Request, res: Response) => {
   const serviceId = Number(req.params.serviceId)
-  const serviceQueue = store.tickets
-    .filter((t) => t.serviceId === serviceId && (t.status === 'waiting' || t.status === 'in_progress'))
-    .sort((a, b) => a.position - b.position)
+  const serviceQueue = queueRepo.listQueueForService(serviceId)
 
   res.status(200).json({
     success: true,
@@ -111,7 +89,7 @@ router.post('/join', (req: Request, res: Response) => {
     errors.notes = `Reason for visit must not exceed ${MAX_NOTES_LENGTH} characters.`
   }
 
-  if (priority !== undefined && !(priority in PRIORITY_RANK)) {
+  if (priority !== undefined && !(typeof priority === 'string' && Object.hasOwn(PRIORITY_RANK, priority))) {
     errors.priority = 'Priority must be "low", "medium", or "high".'
   }
 
@@ -120,38 +98,43 @@ router.post('/join', (req: Request, res: Response) => {
     return
   }
 
+  // Services still live in the in-memory store until /api/services moves to SQL, so it decides whether the service
+  // exists; its current state is mirrored into the Service table for the queue tables to reference.
   const targetService = store.services.find((s) => s.id === Number(serviceId))
   if (!targetService) {
     res.status(404).json({ success: false, error: 'Service not found.' })
     return
   }
+  queueRepo.syncService({
+    id: targetService.id,
+    name: targetService.name,
+    description: targetService.description,
+    duration: targetService.duration,
+    priority: targetService.priority,
+    isOpen: targetService.isOpen
+  })
 
-  if (!targetService.isOpen) {
-    res.status(400).json({ success: false, error: 'Cannot join queue: Service is currently closed.' })
-    return
+  const userId = typeof req.body.userId === 'string' && req.body.userId ? req.body.userId : undefined
+
+  let newTicket
+  try {
+    newTicket = queueRepo.joinQueue({
+      serviceId: Number(serviceId),
+      userName,
+      studentId,
+      notes,
+      priority,
+      userId
+    })
+  } catch (err) {
+    if (sendQueueError(res, err)) return
+    throw err
   }
-
-  const newTicket: Ticket = {
-    id: nextTicketId(),
-    serviceId: targetService.id,
-    serviceName: targetService.name,
-    userName: userName.trim(),
-    studentId: studentId.trim(),
-    notes: notes.trim(),
-    position: 0, // set by recalculateQueue
-    status: 'waiting',
-    estimatedWait: 0, // set by recalculateQueue: (position - 1) * service.duration
-    priority: priority ?? targetService.priority,
-    createdAt: nowTime()
-  }
-
-  store.tickets.push(newTicket)
-  recalculateQueue(targetService.id)
 
   // Dispatch notification
   store.notifications.unshift({
     id: `notif-${Date.now()}`,
-    message: `You joined queue for ${targetService.name}! Ticket #${newTicket.id} (Position #${newTicket.position}).`,
+    message: `You joined queue for ${newTicket.serviceName}! Ticket #${newTicket.id} (Position #${newTicket.position}).`,
     type: 'success',
     timestamp: nowTime()
   })
@@ -172,18 +155,13 @@ router.post('/leave', (req: Request, res: Response) => {
     return
   }
 
-  const index = store.tickets.findIndex((t) => t.id === ticketId)
-  if (index === -1) {
-    res.status(404).json({ success: false, error: 'Ticket not found in active queue.' })
-    return
+  let removed
+  try {
+    removed = queueRepo.leaveQueue(String(ticketId))
+  } catch (err) {
+    if (sendQueueError(res, err)) return
+    throw err
   }
-
-  const [removed] = store.tickets.splice(index, 1)
-  removed.status = 'cancelled'
-  store.history.unshift(removed)
-
-  // Re-calculate positions and waits for everyone still in that service's queue
-  recalculateQueue(removed.serviceId)
 
   res.status(200).json({
     success: true,
@@ -197,45 +175,27 @@ router.post('/serve-next', (req: Request, res: Response) => {
   const { serviceId } = req.body ?? {}
   const sId = Number(serviceId)
 
-  const serviceQueue = store.tickets.filter(
-    (t) => t.serviceId === sId && (t.status === 'waiting' || t.status === 'in_progress')
-  )
-
-  if (serviceQueue.length === 0) {
-    res.status(400).json({ success: false, error: 'No students currently waiting in this service queue.' })
-    return
+  let result
+  try {
+    result = queueRepo.serveNext(sId)
+  } catch (err) {
+    if (sendQueueError(res, err)) return
+    throw err
   }
 
-  // Complete any current in-progress ticket
-  const currentInProgressIndex = store.tickets.findIndex((t) => t.serviceId === sId && t.status === 'in_progress')
-  if (currentInProgressIndex !== -1) {
-    const [completed] = store.tickets.splice(currentInProgressIndex, 1)
-    completed.status = 'completed'
-    completed.completedAt = nowTime()
-    store.history.unshift(completed)
-  }
-
-  // Advance the front of the line (lowest position = highest priority, then earliest arrival)
-  const nextWaiting = store.tickets
-    .filter((t) => t.serviceId === sId && t.status === 'waiting')
-    .sort((a, b) => a.position - b.position)[0]
-
-  if (nextWaiting) {
-    nextWaiting.status = 'in_progress'
-    recalculateQueue(sId) // gives the served ticket position 1 and re-numbers everyone behind it
-
+  if (result.serving) {
     // Trigger notification
     store.notifications.unshift({
       id: `notif-${Date.now()}`,
-      message: `Now serving ${nextWaiting.userName} (Ticket #${nextWaiting.id})!`,
+      message: `Now serving ${result.serving.userName} (Ticket #${result.serving.id})!`,
       type: 'info',
       timestamp: nowTime()
     })
 
     res.status(200).json({
       success: true,
-      message: `Now serving ${nextWaiting.userName}.`,
-      data: nextWaiting
+      message: `Now serving ${result.serving.userName}.`,
+      data: result.serving
     })
     return
   }
